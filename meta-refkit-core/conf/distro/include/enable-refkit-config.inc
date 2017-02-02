@@ -6,6 +6,10 @@
 
 require conf/distro/include/refkit-config.inc
 
+# Modifies settings unconditionally via DISTRO_FEATURES_remove.
+# Once that is fixed, this line can go into refkit-config.inc.
+require conf/distro/include/usrmerge.inc
+
 # Use systemd exclusively.
 DISTRO_FEATURES_BACKFILL_CONSIDERED = "sysvinit"
 VIRTUAL-RUNTIME_init_manager = "systemd"
