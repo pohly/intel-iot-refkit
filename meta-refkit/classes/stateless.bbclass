@@ -18,8 +18,14 @@ STATELESS_DEPRECATED_PATHS ??= ""
 # the device admin.
 STATELESS_RELOCATE ??= "False"
 
-# A space-separated list of recipes which may contain files in /etc.
-STATELESS_PN_WHITELIST ??= ""
+# Set to a true boolean value 1/True for a recipe when it does not
+# need to be stateless, for example with
+# STATELESS_EXCLUDE_pn-core-image-sato = "1"
+#
+# Affects packaging in normal recipes and rootfs mangling in
+# image recipes.
+STATELESS_EXCLUDED = "0"
+
 
 # A space-separated list of shell patterns. Anything matching a
 # pattern is allowed in /etc. Changing this influences the QA check in
@@ -135,7 +141,7 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
 do_install[postfuncs] += "stateless_mangle_package"
 python stateless_mangle_package() {
     pn = d.getVar('PN', True)
-    if pn in (d.getVar('STATELESS_PN_WHITELIST', True) or '').split():
+    if oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
         return
     installdir = d.getVar('D', True)
     docdir = installdir + os.path.join(d.getVar('docdir', True), pn, 'etc')
@@ -152,7 +158,7 @@ python stateless_mangle_package() {
 PACKAGEFUNCS += "stateless_check"
 python stateless_check() {
     pn = d.getVar('PN', True)
-    if pn in (d.getVar('STATELESS_PN_WHITELIST', True) or '').split():
+    if oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
         return
     whitelist = (d.getVar('STATELESS_ETC_WHITELIST', True) or '').split()
     import os
@@ -256,7 +262,7 @@ ROOTFS_POSTUNINSTALL_COMMAND_append = "stateless_mangle_rootfs;"
 
 python stateless_mangle_rootfs () {
     pn = d.getVar('PN', True)
-    if pn in (d.getVar('STATELESS_PN_WHITELIST', True) or '').split():
+    if oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
         return
 
     rootfsdir = d.getVar('IMAGE_ROOTFS', True)
