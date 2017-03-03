@@ -206,6 +206,7 @@ ncurses@core
 netbase@core
 nettle@core
 nodejs@iotweb
+nss-altfiles@refkit
 ocl-icd@refkit
 oe-swupd-helpers@meta-swupd
 opencl-headers@refkit
