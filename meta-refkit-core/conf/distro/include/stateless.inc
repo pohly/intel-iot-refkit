@@ -14,6 +14,9 @@ STATELESS_ETC_WHITELIST += "*"
 # Empty directories must be kept.
 STATELESS_ETC_DIR_WHITELIST += "*"
 
+# The initramfs is read-only and thus doesn't need to be stateless.
+STATELESS_EXCLUDED_pn-refkit-initramfs = "1"
+
 ###########################################################################
 
 # As step towards full stateless IoT Reference OS Kit, we now
