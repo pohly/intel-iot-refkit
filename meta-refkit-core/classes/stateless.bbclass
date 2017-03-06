@@ -51,6 +51,36 @@ STATELESS_RM ??= ""
 STATELESS_RM_ROOTFS ??= ""
 STATELESS_MV_ROOTFS ??= ""
 
+# STATELESS_SRC can be used to inject source code or patches into
+# SRC_URI of a recipe. It is a list of <url> <sha256sum> pairs.
+# This is similar to:
+# SRC_URI_pn-foo = "http://some.example.com/foo.patch;name=foo"
+# SRC_URI[foo.sha256sum] = "1234"
+#
+# Setting the hash sum that way has the drawback of namespace
+# collisions and triggering a world rebuilds for each varflag change,
+# because SRC_URI is modified for all recipes (in contrast to
+# normal variables, there's no syntax for setting varflags
+# per recipe). STATELESS_SRC avoids that because it gets expanded
+# seperately for each recipe.
+STATELESS_SRC = ""
+
+python () {
+    import urllib
+    import os
+    import string
+    src = d.getVar('STATELESS_SRC').split()
+    while src:
+        url = src.pop(0)
+        if not src:
+            bb.fatal('STATELESS_SRC must contain pairs of url + shasum')
+        shasum = src.pop(0)
+        name = os.path.basename(urllib.parse.urlparse(url).path)
+        name = ''.join(filter(lambda x: x in string.ascii_letters, name))
+        d.appendVar('SRC_URI', ' %s;name=%s' % (url, name))
+        d.setVarFlag('SRC_URI', '%s.sha256sum' % name, shasum)
+}
+
 ###########################################################################
 
 def stateless_is_whitelisted(etcentry, whitelist):
