@@ -17,6 +17,9 @@ STATELESS_ETC_DIR_WHITELIST += "*"
 # The initramfs is read-only and thus doesn't need to be stateless.
 STATELESS_EXCLUDED_pn-refkit-initramfs = "1"
 
+# Required to find local patches.
+FILESEXTRAPATHS_prepend = "${META_REFKIT_BASE}/files/stateless/${PN}:"
+
 ###########################################################################
 
 # As step towards full stateless IoT Reference OS Kit, we now
@@ -34,6 +37,11 @@ STATELESS_EXCLUDED_pn-refkit-initramfs = "1"
 # a need to customize it, so the symlink can remain there as read-only
 # system component.
 STATELESS_ETC_WHITELIST += "mtab"
+
+# Do not bail out in "adduser" when /etc/passwd is missing.
+STATELESS_SRC_append_pn-busybox = " \
+    file://adduser-enable-use-without-etc-passwd.patch None \
+"
 
 # Whether the netbase files (services, protocols, hosts, rpc) need to
 # be relocated depends on the image. It will be done during image
@@ -82,7 +90,6 @@ STATELESS_MV_ROOTFS += " \
 
 # Teach shadow about altfiles in /usr/defaults/etc and /usr/defaults/skel.
 # For example, setting a password will copy an existing entry from there into /etc.
-# TODO (?): Busybox adduser does not work when /etc/passwd is missing.
 STATELESS_SRC_append_pn-shadow = " \
     https://raw.githubusercontent.com/clearlinux-pkgs/shadow/2aae81d2f493e340f454e6888c79f71c0414726c/0003-Do-not-fail-on-missing-files-in-etc-create-them-inst.patch \
     3df4182a48a60dc796a2472812adc1a96146c461e6951646c4baaf47e80ed943 \
