@@ -187,12 +187,19 @@ STATELESS_RM_ROOTFS += " \
     udev/hwdb.bin \
 "
 
-# Disable creation of /etc/ld.so.cache in images and bundles. The file
+# Disable creation of /etc/ld.so.cache in stateless images. The file
 # gets already recreated by systemd anyway when booting. Has to be
 # done by unsetting LDCONFIGDEPEND (checked by rootfs.py, which
 # creates the ld.so.cache) for all IoT Reference OS Kit images, but not the
 # refkit-initramfs, so we cannot set it unconditionally.
 python () {
-    if bb.data.inherits_class('refkit-image', d):
+    if not oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
         d.setVar('LDCONFIGDEPEND', '')
 }
+
+# Move away ld.so.conf and let systemd's factory reset mechanism re-create
+# it during boot. For this to work reliably, ldconfig.service must run
+# after systemd-tmpfiles-setup.service. Normally they run in parallel.
+STATELESS_MV_ROOTFS += " \
+    ld.so.conf=factory:ldconfig.service \
+"
