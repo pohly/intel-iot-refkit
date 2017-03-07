@@ -40,6 +40,13 @@ STATELESS_ETC_DIR_WHITELIST ??= ""
 # away. Default is to move into ${datadir}/doc/${PN}/etc. The actual
 # new name can also be given with old-name=new-name, as in
 # "pam.d=${datadir}/pam.d".
+#
+# "factory" as special target name moves the item under
+# /usr/share/factory/etc and adds it to
+# /usr/lib/tmpfiles.d/stateless.conf, so systemd will re-recreate
+# when missing. This runs after journald has been started and local
+# filesystems are mounted, so things required by those operations
+# cannot use the factory mechanism.
 STATELESS_MV ??= ""
 
 # A space-separated list of entries in /etc which can be removed
@@ -128,29 +135,83 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
 
     # Move away files. Default target is docdir, but others can
     # be set by appending =<new name> to the entry, as in
-    # tmpfiles.d=libdir/tmpfiles.d
+    # tmpfiles.d=libdir/tmpfiles.d. "factory" as target adds
+    # the file to those restored by systemd if missing.
     for entry in stateless_mv:
         paths = entry.split('=', 1)
         etcentry = paths[0]
         old = os.path.join(root, 'etc', etcentry)
         if os.path.exists(old) or os.path.islink(old):
+            factory = False
+            tmpfiles_before = []
             if len(paths) > 1:
-                new = root + paths[1]
+                if paths[1] == 'factory' or paths[1].startswith('factory:'):
+                    new = root + '/usr/share/factory/etc/' + paths[0]
+                    factory = True
+                    parts = paths[1].split(':', 1)
+                    if len(parts) > 1:
+                        tmpfiles_before = parts[1].split(',')
+                    (paths[1].split(':', 1)[1:] or [''])[0].split(',')
+                else:
+                    new = root + paths[1]
             else:
                 new = os.path.join(docdir, entry)
             destdir = os.path.dirname(new)
             bb.utils.mkdirhier(destdir)
             # Also handles moving of directories where the target already exists, by
-            # moving the content. When moving a relative symlink the target gets updated.
+            # moving the content. Symlinks are made relative to the target
+            # directory.
+            oldtop = old
             def move(old, new):
                 bb.note('stateless: moving %s to %s' % (old, new))
-                if os.path.isdir(new):
+                if os.path.islink(old):
+                    link = os.readlink(old)
+                    if link.startswith('/'):
+                        target = root + link
+                    else:
+                        target = os.path.join(os.path.dirname(old), link)
+                    target = os.path.normpath(target)
+                    if not factory and os.path.relpath(target, oldtop).startswith('../'):
+                        # Target outside of the root of what we are moving,
+                        # so the target must remain the same despite moving
+                        # the symlink itself.
+                        link = os.path.relpath(target, os.path.dirname(new))
+                    else:
+                        # Target also getting moved or the symlink will be restored
+                        # at its current place, so keep link relative
+                        # to where it is now.
+                        link = os.path.relpath(target, os.path.dirname(old))
+                    if os.path.lexists(new):
+                        os.unlink(new)
+                    os.symlink(link, new)
+                    os.unlink(old)
+                elif os.path.isdir(old):
+                    if os.path.exists(new):
+                        if not os.path.isdir(new):
+                            bb.fatal('stateless: moving directory %s to non-directory %s not supported' % (old, new))
+                    else:
+                        # TODO (?): also copy xattrs
+                        os.mkdir(new)
+                        shutil.copystat(old, new)
+                        stat = os.stat(old)
+                        os.chown(new, stat.st_uid, stat.st_gid)
                     for entry in os.listdir(old):
                         move(os.path.join(old, entry), os.path.join(new, entry))
                     os.rmdir(old)
                 else:
                     os.rename(old, new)
             move(old, new)
+            if factory:
+                with open('%s%s/tmpfiles.d/stateless.conf' % (root, d.getVar('libdir')), 'a+') as f:
+                    f.write('C /etc/%s - - - -\n' % etcentry)
+                if tmpfiles_before:
+                    service_d_dir = '%s%s/systemd-tmpfiles-setup.service.d' % (root, d.getVar('systemd_system_unitdir'))
+                    bb.utils.mkdirhier(service_d_dir)
+                    conf_file = os.path.join(service_d_dir, 'stateless.conf')
+                    with open(conf_file, 'a') as f:
+                        if f.tell() == 0:
+                            f.write('[Unit]\n')
+                        f.write('Before=%s\n' % ' '.join(tmpfiles_before))
 
     # Remove /etc if all that's left are directories.
     # Some directories are expected to exists (for example,
