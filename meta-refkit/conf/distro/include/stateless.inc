@@ -201,3 +201,25 @@ python () {
 STATELESS_MV_ROOTFS += " \
     ld.so.conf=factory:ldconfig.service \
 "
+
+# Anything related to tmpfiles.d in /etc can be considered part of the
+# OS and thus be moved to /usr/lib. This includes /etc files which are
+# named exactly like existing files under /usr/lib: the ones from
+# /usr/lib get overwritten, which preserves the semantic that /etc has
+# higher priority.
+STATELESS_MV_ROOTFS += " \
+    tmpfiles.d=${libdir}/tmpfiles.d \
+"
+
+# Similar for udev. There's just a slight change of semantic:
+# entries in /etc override those from /run, which they no longer
+# do after being moved to /usr/lib - shouldn't matter in practice.
+STATELESS_MV_ROOTFS += " \
+    udev/rules.d=${base_libdir}/udev/rules.d \
+"
+
+# Move /etc/terminfo to /lib/terminfo. That's still going to be
+# used before /usr/share/terminfo.
+STATELESS_MV_ROOTFS += " \
+    terminfo=${base_libdir}/terminfo \
+"
