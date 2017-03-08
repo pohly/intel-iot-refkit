@@ -163,11 +163,9 @@ STATELESS_MV_ROOTFS += " \
 #    https://raw.githubusercontent.com/clearlinux-pkgs/Linux-PAM/0681d308b660919e6a7ee71be41397dbc8516519/0001-pam_securetty-Do-not-report-non-fatal-documented-beh.patch \
 #"
 
-# OE-core puts some files into /etc which systemd then later overwrites
-# unconditionally via /usr/lib/tmpfile.d/etc.conf or creates dynamically
-# (machine-id). Therefore we can remove the redundant files from our rootfs
-# by not packaging them in the first place.
-STATELESS_RM_pn-systemd += " \
+# Both connman and systemd create this via tmpfiles.d, no need to
+# have it in /etc.
+STATELESS_RM_ROOTFS += " \
     resolv.conf \
 "
 
