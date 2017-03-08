@@ -168,7 +168,7 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
 
 
 # Modify ${D} after do_install and before do_package resp. do_populate_sysroot.
-do_install[postfuncs] += "stateless_mangle_package"
+#do_install[postfuncs] += "stateless_mangle_package"
 python stateless_mangle_package() {
     pn = d.getVar('PN', True)
     if oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
