@@ -192,10 +192,14 @@ STATELESS_ETC_WHITELIST += "machine-id"
 STATEFUL_FILES += "/etc/machine-id"
 SWUPD_FILE_BLACKLIST_append = " ${STATEFUL_FILES}"
 
-# Depend on the installed components and thus has to be computed on
-# the device. Handled by systemd during booting or updates.
-STATELESS_RM_ROOTFS += " \
-    udev/hwdb.bin \
+# We can use the pre-generated hwdb.bin as OS default while still
+# allowing the creation of an updated version in /etc later on.
+# systemd-update-done.service will only run when there is
+# something to update in /etc and there are rules in /etc, so
+# we clean that up, too.
+STATELESS_MV_ROOTFS += " \
+    udev/hwdb.bin=${base_libdir}/udev/hwdb.bin \
+    udev/hwdb.d=${base_libdir}/udev/hwdb.d \
 "
 
 # Disable creation of /etc/ld.so.cache in stateless images. The file
