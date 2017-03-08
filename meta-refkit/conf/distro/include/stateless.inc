@@ -223,3 +223,37 @@ STATELESS_MV_ROOTFS += " \
 STATELESS_MV_ROOTFS += " \
     terminfo=${base_libdir}/terminfo \
 "
+
+# systemd/system.conf and systemd/journald.conf can be moved to
+# /usr/share/doc if and only if they only contains the default,
+# commented out values, because non-default values must already be set
+# before these daemons start.
+#
+# For journald.conf that is problematic, because systemd_232.bb
+# changes journald.conf instead of compiling systemd with different
+# defaults. That could be changed. For now we ignore those
+# modifications and thus accept that the first boot without
+# journald.conf will not run quite as it would normally.
+#
+# Service settings can be moved to /usr because they are part
+# of the system.
+#
+# All remaining systemd config files may or may not have been
+# modified and thus get treated as factory defaults.
+STATELESS_POST_POSTPROCESS += " stateless_mv_systemd_conf;"
+stateless_mv_systemd_conf () {
+    for config in system.conf journald.conf; do
+        if [ -e ${IMAGE_ROOTFS}${sysconfdir}/systemd/$config ]; then
+            if settings=`grep -v -e '^\[.*\]$' -e '^#' -e '^$' -e '^RuntimeMaxUse=' -e '^ForwardToSyslog=' ${IMAGE_ROOTFS}/etc/systemd/$config`; then
+                bbfatal "stateless: ${IMAGE_ROOTFS}/etc/systemd/$config contains more than just comments, cannot remove:\n$settings"
+            fi
+            mkdir -p ${IMAGE_ROOTFS}${datadir}/doc/etc/systemd
+            mv ${IMAGE_ROOTFS}${sysconfdir}/systemd/$config ${IMAGE_ROOTFS}${datadir}/doc/etc/systemd
+        fi
+    done
+}
+STATELESS_MV_ROOTFS += " \
+    systemd/system=${systemd_system_unitdir} \
+    xdg/systemd=factory \
+    systemd=factory \
+"
