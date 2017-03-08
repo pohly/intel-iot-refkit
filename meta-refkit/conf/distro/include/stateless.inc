@@ -168,6 +168,19 @@ STATELESS_MV_ROOTFS += " \
 STATELESS_RM_ROOTFS += " \
     resolv.conf \
 "
+# When connman is installed, the intent probably is to use it also as
+# resolver. This happens to work in practice (connman_resolvconf.conf
+# sorts before etc.conf), but systemd warns about the conflict.
+# Better avoid that conflict.
+STATELESS_POST_POSTPROCESS += " stateless_pick_resolv_conf; "
+stateless_pick_resolv_conf () {
+    if ( [ -e ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d/connman_resolvconf.conf ] ||
+        [ -e ${IMAGE_ROOTFS}${libdir}/tmpfiles.d/connman_resolvconf.conf ] ) &&
+       [ -f ${IMAGE_ROOTFS}${libdir}/tmpfiles.d/etc.conf ]; then
+        sed -i -e 's;^\(L.* /etc/resolv.conf *.*\);# provided by connman: \1;' \
+            ${IMAGE_ROOTFS}${libdir}/tmpfiles.d/etc.conf
+    fi
+}
 
 # machine-id has to be present in images at least as an empty file
 # because we might boot with the rootfs read/only. Otherwise
