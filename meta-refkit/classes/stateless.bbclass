@@ -51,6 +51,18 @@ STATELESS_RM ??= ""
 STATELESS_RM_ROOTFS ??= ""
 STATELESS_MV_ROOTFS ??= ""
 
+# Semicolon-separated commands which get run after RM/MV ROOTFS
+# changes and before the normal ROOTFS_POSTPROCESS_COMMAND, if
+# the image is meant to be stateless.
+STATELESS_PRE_POSTPROCESS ??= ""
+
+# Semicolon-separated commands which get run after the normal
+# ROOTFS_POSTPROCESS_COMMAND, if the image is meant to be stateless.
+STATELESS_POST_POSTPROCESS ??= ""
+
+# Extra packages to be installed into stateless images.
+STATELESS_EXTRA_INSTALL ??= ""
+
 # STATELESS_SRC can be used to inject source code or patches into
 # SRC_URI of a recipe. It is a list of <url> <sha256sum> pairs.
 # This is similar to:
@@ -82,6 +94,15 @@ python () {
 }
 
 ###########################################################################
+
+# TODO: using _prepend and _append does not completely ensure the intended
+# semantic, because other commands might be injected the same way
+# and then ordering is not deterministic. For example, sort_passwd ends
+# up running after removing /etc/passwd, which defeats the purpose.
+ROOTFS_POSTPROCESS_COMMAND_prepend = "${@ '${STATELESS_PRE_POSTPROCESS}' if not oe.types.boolean('${STATELESS_EXCLUDED}') else '' }"
+ROOTFS_POSTPROCESS_COMMAND_append = "${@ '${STATELESS_POST_POSTPROCESS}' if not oe.types.boolean('${STATELESS_EXCLUDED}') else '' }"
+
+CORE_IMAGE_EXTRA_INSTALL .= "${@ ' ${STATELESS_EXTRA_INSTALL}' if not oe.types.boolean('${STATELESS_EXCLUDED}') else '' }"
 
 def stateless_is_whitelisted(etcentry, whitelist):
     import fnmatch
