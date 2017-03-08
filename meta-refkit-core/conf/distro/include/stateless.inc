@@ -235,6 +235,12 @@ STATELESS_MV_ROOTFS += " \
     udev/rules.d=${base_libdir}/udev/rules.d \
 "
 
+# By ensuring that udevd starts after tmpfiles, we can move
+# its main config file into the factory defaults.
+STATELESS_MV_ROOTFS += " \
+    udev/udev.conf=factory:systemd-udevd.service \
+"
+
 # Move /etc/terminfo to /lib/terminfo. That's still going to be
 # used before /usr/share/terminfo.
 STATELESS_MV_ROOTFS += " \
