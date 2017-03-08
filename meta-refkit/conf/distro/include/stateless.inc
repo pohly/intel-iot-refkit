@@ -280,3 +280,36 @@ STATELESS_MV_ROOTFS += " \
     xdg/systemd=factory \
     systemd=factory \
 "
+
+# Several files in /etc/ssl can become factory defaults.
+# /etc/ssl/certs and /etc/ssl itself will be dealt with below.
+STATELESS_MV_ROOTFS += " \
+    ssl/openssl.cnf=factory \
+    ssl/private=factory \
+"
+REFKIT_QA_IMAGE_SYMLINK_WHITELIST_append = " \
+    ${sysconfdir}/ssl/openssl.cnf \
+    ${sysconfdir}/ssl/private \
+"
+
+# We could just dump /etc/ssl/certs entirely into the factory
+# defaults, but that sounds redundant, because the content
+# is already generated from read-only system content. Instead,
+# we extend systemd-tmpfiles-setup.service so that it
+# also runs update-ca-certificates.
+STATELESS_POST_POSTPROCESS += " stateless_rm_etc_ssl_certs;"
+stateless_rm_etc_ssl_certs () {
+    if [ -e ${IMAGE_ROOTFS}${sbindir}/update-ca-certificates ] &&
+       [ -e ${IMAGE_ROOTFS}${systemd_system_unitdir}/systemd-tmpfiles-setup.service ]; then
+        echo "ExecStartPost=/bin/sh -c '[ -e ${sysconfdir}/ssl/certs/ca-certificates.crt ] || ${sbindir}/update-ca-certificates'" >>${IMAGE_ROOTFS}${systemd_system_unitdir}/systemd-tmpfiles-setup.service
+        rm -rf ${IMAGE_ROOTFS}${sysconfdir}/ssl/certs
+        # If empty now, /etc/ssl can be removed, too.
+        if rmdir ${IMAGE_ROOTFS}${sysconfdir}/ssl; then
+            echo "d ${sysconfdir}/ssl 0755 root root - -" >>${IMAGE_ROOTFS}${libdir}/tmpfiles.d/stateless.conf
+        fi
+        echo "d ${sysconfdir}/ssl/certs 0755 root root - -" >>${IMAGE_ROOTFS}${libdir}/tmpfiles.d/stateless.conf
+    fi
+}
+REFKIT_QA_IMAGE_SYMLINK_WHITELIST_append = " \
+    ${sysconfdir}/ssl/certs \
+"
