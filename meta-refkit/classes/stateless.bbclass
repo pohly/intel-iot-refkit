@@ -1,15 +1,7 @@
-# This moves files out of /etc. It gets applied both
-# to individual packages (to avoid or at least catch problems
-# early) as well as the entire rootfs (to catch files not
-# contained in packages).
-
-# Package QA check which greps for known bad paths which should
-# not be used anymore, like files which used to be in /etc and
-# got moved elsewhere.
-STATELESS_DEPRECATED_PATHS ??= ""
-
-# Check not activated by default, can be done in distro with:
-# ERROR_QA += "stateless"
+# This moves files out of /etc. It gets applied during
+# rootfs creation, so packages do not need to be modified
+# (although configuring them differently may lead to
+# better results).
 
 # If set to True, a recipe gets configured with
 # sysconfdir=${datadir}/defaults. If set to a path, that
@@ -29,11 +21,12 @@ STATELESS_EXCLUDED = "0"
 
 # A space-separated list of shell patterns. Anything matching a
 # pattern is allowed in /etc. Changing this influences the QA check in
-# do_package and do_rootfs.
+# do_rootfs.
 STATELESS_ETC_WHITELIST ??= "${STATELESS_ETC_DIR_WHITELIST}"
 
-# A subset of STATELESS_ETC_WHITELIST which also influences do_install
-# and determines which directories to keep.
+# A subset of STATELESS_ETC_WHITELIST which determines which directories
+# to keep in /etc although they are empty. Normally such directories
+# get removed.
 STATELESS_ETC_DIR_WHITELIST ??= ""
 
 # A space-separated list of entries in /etc which need to be moved
@@ -47,16 +40,13 @@ STATELESS_ETC_DIR_WHITELIST ??= ""
 # when missing. This runs after journald has been started and local
 # filesystems are mounted, so things required by those operations
 # cannot use the factory mechanism.
-STATELESS_MV ??= ""
+#
+# Gets applied before the normal ROOTFS_POSTPROCESS_COMMANDs.
+STATELESS_MV_ROOTFS ??= ""
 
 # A space-separated list of entries in /etc which can be removed
 # entirely.
-STATELESS_RM ??= ""
-
-# Same as the previous ones, except that they get applied to the rootfs
-# before running ROOTFS_POSTPROCESS_COMMANDs.
 STATELESS_RM_ROOTFS ??= ""
-STATELESS_MV_ROOTFS ??= ""
 
 # Semicolon-separated commands which get run after RM/MV ROOTFS
 # changes and before the normal ROOTFS_POSTPROCESS_COMMAND, if
@@ -247,74 +237,6 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
             for file in files:
                 bb.note('stateless: /etc not empty: %s' % os.path.join(root, file))
         tryrmdir(etcdir)
-
-
-# Modify ${D} after do_install and before do_package resp. do_populate_sysroot.
-#do_install[postfuncs] += "stateless_mangle_package"
-python stateless_mangle_package() {
-    pn = d.getVar('PN', True)
-    if oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
-        return
-    installdir = d.getVar('D', True)
-    docdir = installdir + os.path.join(d.getVar('docdir', True), pn, 'etc')
-    whitelist = (d.getVar('STATELESS_ETC_DIR_WHITELIST', True) or '').split()
-
-    stateless_mangle(d, installdir, docdir,
-                     (d.getVar('STATELESS_MV', True) or '').split(),
-                     (d.getVar('STATELESS_RM', True) or '').split(),
-                     whitelist,
-                     True)
-}
-
-# Check that nothing is left in /etc.
-PACKAGEFUNCS += "stateless_check"
-python stateless_check() {
-    pn = d.getVar('PN', True)
-    if oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
-        return
-    whitelist = (d.getVar('STATELESS_ETC_WHITELIST', True) or '').split()
-    import os
-    sane = True
-    for pkg, files in pkgfiles.items():
-        pkgdir = os.path.join(d.getVar('PKGDEST', True), pkg)
-        for file in files:
-            targetfile = file[len(pkgdir):]
-            if targetfile.startswith('/etc/') and \
-               not stateless_is_whitelisted(targetfile[len('/etc/'):], whitelist):
-                bb.warn("stateless: %s should not contain %s" % (pkg, file))
-                sane = False
-    if not sane:
-        d.setVar("QA_SANE", "")
-}
-
-QAPATHTEST[stateless] = "stateless_qa_check_paths"
-def stateless_qa_check_paths(file,name, d, elf, messages):
-    """
-    Check for deprecated paths that should no longer be used.
-    """
-
-    if os.path.islink(file):
-        return
-
-    # Ignore ipk and deb's CONTROL dir
-    if file.find(name + "/CONTROL/") != -1 or file.find(name + "/DEBIAN/") != -1:
-        return
-
-    bad_paths = d.getVar('STATELESS_DEPRECATED_PATHS', True).split()
-    if bad_paths:
-        import subprocess
-        import pipes
-        cmd = "strings -a %s | grep -F '%s' | sort -u" % (pipes.quote(file), '\n'.join(bad_paths))
-        s = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = s.communicate()
-        # Cannot check return code, some of them may get lost because we use a pipe
-        # and cannot rely on bash's pipefail. Instead just check for unexpected
-        # stderr content.
-        if stderr:
-            bb.fatal('Checking %s for paths deprecated via STATELESS_DEPRECATED_PATHS failed:\n%s' % (file, stderr))
-        if stdout:
-            package_qa_add_message(messages, "stateless", "%s: %s contains paths deprecated in a stateless configuration: %s" % (name, package_qa_clean_path(file, d), stdout))
-do_package_qa[vardeps] += "stateless_qa_check_paths"
 
 python () {
     # The bitbake cache must be told explicitly that changes in the
