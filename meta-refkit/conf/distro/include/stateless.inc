@@ -308,3 +308,45 @@ stateless_rm_etc_ssl_certs () {
 REFKIT_QA_IMAGE_SYMLINK_WHITELIST_append = " \
     ${sysconfdir}/ssl/certs \
 "
+
+# /etc/machine-id can be removed if the rootfs gets mounted rw.
+# Note that this also triggers the ConditionFirstBoot, something
+# that is not normally done in OE-core. It causes systemd to
+# auto-enable units according to their [Install] sections, and
+# at least for wpa_supplicant that is broken (see workaround below).
+# Perhaps it is better to always keep /etc/machine-id.
+STATELESS_POST_POSTPROCESS += " stateless_rm_machine_id;"
+stateless_rm_machine_id () {
+    if [ -e ${IMAGE_ROOTFS}${sysconfdir}/machine-id ]; then
+        rw=1
+        for param in ${APPEND}; do
+            case "$param" in ro) rw=;;
+                             rw) rw=1;;
+            esac
+        done
+
+        if [ "$rw" ]; then
+            rm ${IMAGE_ROOTFS}${sysconfdir}/machine-id
+            # Fix broken /lib/systemd/system/wpa_supplicant*@.service
+            # templates:
+            #   [Install]
+            #   Alias=multi-user.target.wants/wpa_supplicant@%i.service
+            # does not make sense because there's nothing at install
+            # time that expands %i to something reasonable. When first
+            # boot is active, we end up with
+            # /etc/systemd/system/multi-user.target.wants/wpa_supplicant@.service
+            #
+            # That then instantiates wpa_supplicant@multi-user.service
+            # (apparently because that's what systemd uses as %i in this
+            # case), which can't work (not a valid device), leading to
+            # a 90 second delay waiting for sys-subsystem-net-devices-multi-user.device.
+            # Same problem as in https://www.reddit.com/r/archlinux/comments/4mnkyu/timeout_during_boot/?st=j03jwv0d&sh=14c1a955
+            # Reported upstream here: http://lists.infradead.org/pipermail/hostap/2017-March/037330.html
+            if [ -e ${IMAGE_ROOTFS}${systemd_system_unitdir}/wpa_supplicant@.service ]; then
+                sed -i -e 's/^\(Alias=.*%i\)/# broken use of %i: \1/' ${IMAGE_ROOTFS}${systemd_system_unitdir}/wpa_supplicant*@.service
+            fi
+        else
+            bbnote "stateless: cannot remove ${sysconfdir}/machine-id because rootfs will be mounted ro initially, due to APPEND=${APPEND}"
+        fi
+    fi
+}
