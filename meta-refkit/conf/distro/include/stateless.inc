@@ -350,3 +350,9 @@ stateless_rm_machine_id () {
         fi
     fi
 }
+
+# systemd-modules-load.service supports /etc/modules-load.d as well
+# as /usr/lib/modules-load.d.
+STATELESS_MV_ROOTFS += " \
+    modules-load.d=${libdir}/modules-load.d \
+"
