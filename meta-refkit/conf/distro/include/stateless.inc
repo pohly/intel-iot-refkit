@@ -367,3 +367,8 @@ STATELESS_MV_ROOTFS += " \
 # is left in place by default. A distro where fstab is known
 # to be not needed can do:
 # STATELESS_RM_ROOTFS += "fstab"
+
+# We want to be stateless, so override the /etc/build default.
+# It currently gets created after STATELESS_MV_ROOTFS, so
+# we can't do it that way.
+IMAGE_BUILDINFO_FILE ?= "${libdir}/build"
