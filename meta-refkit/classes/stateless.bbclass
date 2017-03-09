@@ -14,10 +14,16 @@ STATELESS_RELOCATE ??= "False"
 # need to be stateless, for example with
 # STATELESS_EXCLUDE_pn-core-image-sato = "1"
 #
-# Affects packaging in normal recipes and rootfs mangling in
-# image recipes.
-STATELESS_EXCLUDED = "0"
-
+# The default is to exclude images which have
+# the "read-only" image feature set, because in those /etc can
+# be considered part of the read-only OS, and images
+# which are built as initramfs (detected based on their
+# IMAGE_FSTYPES).
+STATELESS_EXCLUDED ??= "${@ '1' if \
+    bb.data.inherits_class('image', d) and \
+    ('read-only' in d.getVar('IMAGE_FEATURES').split() or \
+     d.getVar('IMAGE_FSTYPES') == d.getVar('INITRAMFS_FSTYPES')) \
+    else '0' }"
 
 # A space-separated list of shell patterns. Anything matching a
 # pattern is allowed in /etc. Changing this influences the QA check in
