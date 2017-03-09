@@ -116,8 +116,11 @@ def stateless_is_whitelisted(etcentry, whitelist):
 
 def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, is_package):
     import os
+    import stat
     import errno
     import shutil
+
+    tmpfilesdir = '%s%s/tmpfiles.d' % (root, d.getVar('libdir'))
 
     # Remove content that is no longer needed.
     for entry in stateless_rm:
@@ -158,8 +161,10 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
             # moving the content. Symlinks are made relative to the target
             # directory.
             oldtop = old
+            moved = []
             def move(old, new):
                 bb.note('stateless: moving %s to %s' % (old, new))
+                moved.append('/' + os.path.relpath(old, root))
                 if os.path.islink(old):
                     link = os.readlink(old)
                     if link.startswith('/'):
@@ -198,8 +203,24 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
                     os.rename(old, new)
             move(old, new)
             if factory:
-                with open('%s%s/tmpfiles.d/stateless.conf' % (root, d.getVar('libdir')), 'a+') as f:
+                # Add new tmpfiles.d entry for the top-level directory.
+                with open(os.path.join(tmpfilesdir, 'stateless.conf'), 'a+') as f:
                     f.write('C /etc/%s - - - -\n' % etcentry)
+                # We might have moved an entry for which systemd (or something else)
+                # already had a tmpfiles.d entry. We need to remove that other entry
+                # to ensure that ours is used instead.
+                for file in os.listdir(tmpfilesdir):
+                    if file.endswith('.conf') and file != 'stateless.conf':
+                        with open(os.path.join(tmpfilesdir, file), 'r+') as f:
+                            lines = []
+                            for line in f.readlines():
+                                parts = line.split()
+                                if len(parts) >= 2 and parts[1] in moved:
+                                    line = '# replaced by stateless.conf entry: ' + line
+                                lines.append(line)
+                            f.seek(0)
+                            f.write(''.join(lines))
+                # Ensure that the listed service(s) start after tmpfiles.d setup.
                 if tmpfiles_before:
                     service_d_dir = '%s%s/systemd-tmpfiles-setup.service.d' % (root, d.getVar('systemd_system_unitdir'))
                     bb.utils.mkdirhier(service_d_dir)
@@ -226,8 +247,19 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
            bb.note('stateless: keeping white-listed directory %s' % path)
            return
         bb.note('stateless: removing dir %s' % path)
+        path_stat = os.stat(path)
         try:
             os.rmdir(path)
+            # We may have moved some content into the tmpfiles.d factory,
+            # and that then depends on re-creating these directories.
+            etcentry = os.path.relpath(path, etcdir)
+            if etcentry != '.':
+                with open(os.path.join(tmpfilesdir, 'stateless.conf'), 'a') as f:
+                    f.write('D /etc/%s 0%o %d %d - -\n' %
+                            (etcentry,
+                             stat.S_IMODE(path_stat.st_mode),
+                             path_stat.st_uid,
+                             path_stat.st_gid))
         except OSError as ex:
             bb.note('stateless: removing dir failed: %s' % ex)
             if ex.errno != errno.ENOTEMPTY:
