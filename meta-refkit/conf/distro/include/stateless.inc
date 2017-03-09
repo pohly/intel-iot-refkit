@@ -172,6 +172,11 @@ stateless_pick_resolv_conf () {
     fi
 }
 
+# Also covered by systemd's etc.conf.
+STATELESS_RM_ROOTFS += " \
+    mtab \
+"
+
 # machine-id has to be present in images at least as an empty file
 # because we might boot with the rootfs read/only. Otherwise
 # creating it during early boot fails (see
