@@ -379,3 +379,35 @@ IMAGE_BUILDINFO_FILE ?= "${libdir}/build"
 STATELESS_MV_ROOTFS += " \
     hostname=factory \
 "
+
+# Various things that systemd and journald do not need when they
+# start.
+STATELESS_MV_ROOTFS += " \
+    asound.conf=factory \
+    bluetooth=factory \
+    busybox.links.nosuid=factory \
+    busybox.links.suid=factory \
+    ca-certificates.conf=factory \
+    dbus-1=factory \
+    default=factory \
+    environment=factory \
+    filesystems=factory \
+    host.conf=factory \
+    inputrc=factory \
+    issue=factory \
+    issue.net=factory \
+    libnl=factory \
+    mke2fs.conf=factory \
+    motd=factory \
+    network=factory \
+    os-release=factory \
+    profile=factory \
+    request-key.conf=factory \
+    security=factory \
+    ssh=factory \
+    skel=factory \
+    timestamp=factory \
+    udhcpc.d=factory \
+    version=factory \
+    wpa_supplicant.conf=factory \
+"
