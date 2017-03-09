@@ -2,8 +2,6 @@ INHERIT += "stateless"
 
 ###########################################################################
 
-# Temporary overrides until IoT Reference OS Kit is fully stateless.
-
 # This entry here allows everything in /etc because IoT Reference OS Kit is
 # not actually stateless yet. We merely use the stateless.bbclass
 # to remove files from /etc which get written on the device
@@ -13,9 +11,6 @@ STATELESS_ETC_WHITELIST += "*"
 
 # Empty directories must be kept.
 STATELESS_ETC_DIR_WHITELIST += "*"
-
-# The initramfs is read-only and thus doesn't need to be stateless.
-STATELESS_EXCLUDED_pn-refkit-initramfs = "1"
 
 # Required to find local patches.
 FILESEXTRAPATHS_prepend = "${META_REFKIT_BASE}/files/stateless/${PN}:"
@@ -42,11 +37,6 @@ STATELESS_ETC_WHITELIST += "mtab"
 STATELESS_SRC_append_pn-busybox = " \
     file://adduser-enable-use-without-etc-passwd.patch None \
 "
-
-# Whether the netbase files (services, protocols, hosts, rpc) need to
-# be relocated depends on the image. It will be done during image
-# creation.
-STATELESS_EXCLUDED_pn-netbase = "1"
 
 # Enables the use of /usr/defaults/etc/nsswitch.conf as fallback
 # for /etc/nsswitch.conf.
