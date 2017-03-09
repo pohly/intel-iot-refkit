@@ -356,3 +356,14 @@ stateless_rm_machine_id () {
 STATELESS_MV_ROOTFS += " \
     modules-load.d=${libdir}/modules-load.d \
 "
+
+# /etc/fstab can be removed only under special circumstances:
+# - no local file systems besides root
+# - rootfs gets mounted rw immediately
+# - no additional special mount options for root that need
+#   to be applied via remount
+#
+# This is too complicated to check here, therefore /etc/fstab
+# is left in place by default. A distro where fstab is known
+# to be not needed can do:
+# STATELESS_RM_ROOTFS += "fstab"
