@@ -357,6 +357,10 @@ DEPENDS += "${@ 'attr-native' if '${REFKIT_IMAGE_STRIP_SMACK}' else '' }"
 # made due to filesystem metadata time stamps being in future.
 APPEND_append = " fsck.mode=skip"
 
+# Because our rootfs gets mounted rw by the initramfs (the default)
+# and we don't have anything special in /etc/fstab, we can remove it.
+STATELESS_RM_ROOTFS += "fstab"
+
 # Ensure that images preserve Smack labels and IMA/EVM.
 inherit ${@bb.utils.contains_any('IMAGE_FEATURES', ['ima','smack'], 'xattr-images', '', d)}
 
