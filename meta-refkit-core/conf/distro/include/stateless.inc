@@ -2,16 +2,6 @@ INHERIT += "stateless"
 
 ###########################################################################
 
-# This entry here allows everything in /etc because IoT Reference OS Kit is
-# not actually stateless yet. We merely use the stateless.bbclass
-# to remove files from /etc which get written on the device
-# and thus must be excluded from images and, more importantly,
-# swupd bundles.
-STATELESS_ETC_WHITELIST += "*"
-
-# Empty directories must be kept.
-STATELESS_ETC_DIR_WHITELIST += "*"
-
 # Required to find local patches.
 FILESEXTRAPATHS_prepend = "${META_REFKIT_BASE}/files/stateless/${PN}:"
 
@@ -26,12 +16,6 @@ FILESEXTRAPATHS_prepend = "${META_REFKIT_BASE}/files/stateless/${PN}:"
 # The implication is that we must keep certain files out of the rootfs
 # which do get modified at runtime, because otherwise there are
 # "swupd verify" failures.
-
-# mtab needs to be a symlink to /proc/mounts, probably forever.
-# There is no point in patching that out of binaries, nor is there
-# a need to customize it, so the symlink can remain there as read-only
-# system component.
-STATELESS_ETC_WHITELIST += "mtab"
 
 # Do not bail out in "adduser" when /etc/passwd is missing.
 STATELESS_SRC_append_pn-busybox = " \
@@ -176,12 +160,6 @@ stateless_pick_resolv_conf () {
 STATELESS_RM_ROOTFS += " \
     mtab \
 "
-
-# machine-id has to be present in images at least as an empty file
-# because we might boot with the rootfs read/only. Otherwise
-# creating it during early boot fails (see
-# systemd/src/core/machine-id-setup.c).
-STATELESS_ETC_WHITELIST += "machine-id"
 
 # These files must be ignored by swupd.
 STATEFUL_FILES += "/etc/machine-id"
