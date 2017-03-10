@@ -372,3 +372,10 @@ STATELESS_MV_ROOTFS += " \
 # It currently gets created after STATELESS_MV_ROOTFS, so
 # we can't do it that way.
 IMAGE_BUILDINFO_FILE ?= "${libdir}/build"
+
+# Moving /etc/hostname has the effect that a reboot is required
+# before the configured hostname becomes effective again. As not
+# much depends on it, that seems a reasonable default.
+STATELESS_MV_ROOTFS += " \
+    hostname=factory \
+"
