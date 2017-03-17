@@ -1,29 +1,33 @@
-# This moves files out of /etc. It gets applied both
-# to individual packages (to avoid or at least catch problems
-# early) as well as the entire rootfs (to catch files not
-# contained in packages).
+# The goal of this class is to enable booting with an entirely empty
+# /etc. When that works, factory resets become easy (just wipe out
+# /etc). System updates also become easier, because all configuration
+# files are part of the read-only /usr.
+#
+# The goal is not to have an entirely empty /etc at runtime. There are
+# too many components which still expect files there for this to be
+# practical. This is covered by copying files from the read-only
+# default to /etc or generate files in /etc. This can be repeated
+# after a system update to also update /etc.
+#
+# Except for patching some components to work better without files
+# in /etc, most of the necessary changes happen during rootfs
+# construction, so the same distro can be used to create "normal"
+# and "stateless" images.
+#
+# This transformation happens after all normal ROOTFS_POSTPROCESS_COMMANDs
+# are run (more specifically, in ROOTFS_POSTUNINSTALL_COMMAND). That
+# is necessary because several commands still need the full /etc (like
+# setting an empty root password).
 
-# Package QA check which greps for known bad paths which should
-# not be used anymore, like files which used to be in /etc and
-# got moved elsewhere.
-STATELESS_DEPRECATED_PATHS ??= ""
-
-# Check not activated by default, can be done in distro with:
-# ERROR_QA += "stateless"
-
-# If set to True, a recipe gets configured with
-# sysconfdir=${datadir}/defaults. If set to a path, that
-# path is used instead. In both cases, /etc typically gets
-# ignored and the component no longer can be configured by
-# the device admin.
-STATELESS_RELOCATE ??= "False"
-
-# A space-separated list of recipes which may contain files in /etc.
-STATELESS_PN_WHITELIST ??= ""
+# 1/True/Yes when an image is meant to be stateless, 0/False/No
+# otherwise.  The default is to not modified read-only images
+# (detected based on the read-only image feature or the special
+# IMAGE_FSTYPES used by an initramfs) and to modify everything else.
+STATELESS_ACTIVE ??= "${@ '0' if 'read-only' in (d.getVar('IMAGE_FEATURES') or '').split() or d.getVar('IMAGE_FSTYPES') == d.getVar('INITRAMFS_FSTYPES') else '1' }"
 
 # A space-separated list of shell patterns. Anything matching a
 # pattern is allowed in /etc. Changing this influences the QA check in
-# do_package and do_rootfs.
+# do_rootfs.
 STATELESS_ETC_WHITELIST ??= "${STATELESS_ETC_DIR_WHITELIST}"
 
 # A subset of STATELESS_ETC_WHITELIST which also influences do_install
@@ -34,18 +38,50 @@ STATELESS_ETC_DIR_WHITELIST ??= ""
 # away. Default is to move into ${datadir}/doc/${PN}/etc. The actual
 # new name can also be given with old-name=new-name, as in
 # "pam.d=${datadir}/pam.d".
-STATELESS_MV ??= ""
+#
+# As a special case, old-name=factory moves
+# into the factory defaults under /usr/lib/factory. A systemd tmpfiles.d
+# entry will be created for that which restores the content at early
+# boot.
+#
+# TODO: systemd services that depend on moved files?
+STATELESS_MV ?= ""
 
 # A space-separated list of entries in /etc which can be removed
 # entirely.
-STATELESS_RM ??= ""
+STATELESS_RM ?= ""
 
-# Same as the previous ones, except that they get applied to the rootfs
-# before running ROOTFS_POSTPROCESS_COMMANDs.
-STATELESS_RM_ROOTFS ??= ""
-STATELESS_MV_ROOTFS ??= ""
+# A list of semicolon-separated commands that get executed after all
+# normal ROOTFS_POSTPROCESS_COMMANDs if (and only if) the current
+# image is meant to be stateless.
+STATELESS_POSTPROCESS_COMMAND ?= ""
+
+# A list of <url> <sha256sum> pairs which get injected into SRC_URI
+# SRC_URI[<name>.sha256sum] of a receipe. This way, a distro-level
+# include file can add source code or patches into specific recipes
+# via STATELESS_SRC_pn-<recipe>. This is necessary because
+# _append_pn-<recipe> does not work for SRC_URI[<name>.sha256sum].
+STATELESS_SRC ?= ""
 
 ###########################################################################
+
+# Apply STATELESS_SRC.
+python () {
+    import os
+    import urllib
+
+    src = d.getVar('STATELESS_SRC').split()
+    if len(src) % 2:
+        bb.fatal('STATELESS_SRC must contain a list of <url> <sha256sum> pairs, got odd number of entries instead: %s' % src)
+    while src:
+        url = src.pop(0)
+        hash = src.pop(0)
+        path = urllib.parse.urlparse(url).path
+        name = os.path.basename(path)
+        url = url + ';name=%s' % name
+        d.appendVar('SRC_URI', url)
+        d.setVarFlag('SRC_URI', '%s.sha256sum', hash)
+}
 
 def stateless_is_whitelisted(etcentry, whitelist):
     import fnmatch
@@ -131,140 +167,17 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
         tryrmdir(etcdir)
 
 
-# Modify ${D} after do_install and before do_package resp. do_populate_sysroot.
-do_install[postfuncs] += "stateless_mangle_package"
-python stateless_mangle_package() {
-    pn = d.getVar('PN', True)
-    if pn in (d.getVar('STATELESS_PN_WHITELIST', True) or '').split():
-        return
-    installdir = d.getVar('D', True)
-    docdir = installdir + os.path.join(d.getVar('docdir', True), pn, 'etc')
-    whitelist = (d.getVar('STATELESS_ETC_DIR_WHITELIST', True) or '').split()
-
-    stateless_mangle(d, installdir, docdir,
-                     (d.getVar('STATELESS_MV', True) or '').split(),
-                     (d.getVar('STATELESS_RM', True) or '').split(),
-                     whitelist,
-                     True)
-}
-
-# Check that nothing is left in /etc.
-PACKAGEFUNCS += "stateless_check"
-python stateless_check() {
-    pn = d.getVar('PN', True)
-    if pn in (d.getVar('STATELESS_PN_WHITELIST', True) or '').split():
-        return
-    whitelist = (d.getVar('STATELESS_ETC_WHITELIST', True) or '').split()
-    import os
-    sane = True
-    for pkg, files in pkgfiles.items():
-        pkgdir = os.path.join(d.getVar('PKGDEST', True), pkg)
-        for file in files:
-            targetfile = file[len(pkgdir):]
-            if targetfile.startswith('/etc/') and \
-               not stateless_is_whitelisted(targetfile[len('/etc/'):], whitelist):
-                bb.warn("stateless: %s should not contain %s" % (pkg, file))
-                sane = False
-    if not sane:
-        d.setVar("QA_SANE", "")
-}
-
-QAPATHTEST[stateless] = "stateless_qa_check_paths"
-def stateless_qa_check_paths(file,name, d, elf, messages):
-    """
-    Check for deprecated paths that should no longer be used.
-    """
-
-    if os.path.islink(file):
-        return
-
-    # Ignore ipk and deb's CONTROL dir
-    if file.find(name + "/CONTROL/") != -1 or file.find(name + "/DEBIAN/") != -1:
-        return
-
-    bad_paths = d.getVar('STATELESS_DEPRECATED_PATHS', True).split()
-    if bad_paths:
-        import subprocess
-        import pipes
-        cmd = "strings -a %s | grep -F '%s' | sort -u" % (pipes.quote(file), '\n'.join(bad_paths))
-        s = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = s.communicate()
-        # Cannot check return code, some of them may get lost because we use a pipe
-        # and cannot rely on bash's pipefail. Instead just check for unexpected
-        # stderr content.
-        if stderr:
-            bb.fatal('Checking %s for paths deprecated via STATELESS_DEPRECATED_PATHS failed:\n%s' % (file, stderr))
-        if stdout:
-            package_qa_add_message(messages, "stateless", "%s: %s contains paths deprecated in a stateless configuration: %s" % (name, package_qa_clean_path(file, d), stdout))
-do_package_qa[vardeps] += "stateless_qa_check_paths"
-
-python () {
-    # The bitbake cache must be told explicitly that changes in the
-    # directories have an effect on the recipe. Otherwise adding
-    # or removing patches or whole directories does not trigger
-    # re-parsing and re-building.
-    import os
-    patchdir = d.expand('${STATELESS_PATCHES_BASE}/${PN}')
-    bb.parse.mark_dependency(d, patchdir)
-    if os.path.isdir(patchdir):
-        patches = os.listdir(patchdir)
-        if patches:
-            filespath = d.getVar('FILESPATH', True)
-            d.setVar('FILESPATH', filespath + ':' + patchdir)
-            srcuri = d.getVar('SRC_URI', True)
-            d.setVar('SRC_URI', srcuri + ' ' + ' '.join(['file://' + x for x in sorted(patches)]))
-
-    # Dynamically reconfigure the package to use /usr instead of /etc for
-    # configuration files.
-    relocate = d.getVar('STATELESS_RELOCATE', True)
-    if relocate != 'False':
-        defaultsdir = d.expand('${datadir}/defaults') if relocate == 'True' else relocate
-        d.setVar('sysconfdir', defaultsdir)
-        d.setVar('EXTRA_OECONF', d.getVar('EXTRA_OECONF', True) + " --sysconfdir=" + defaultsdir)
-}
-
-# Several post-install scripts modify /etc.
-# For example:
-# /etc/shells - gets extended when installing a shell package
-# /etc/passwd - adduser in postinst extends it
-# /etc/systemd/system - has several .wants entries
-#
-# We fix this directly after the write_image_manifest command
-# in the ROOTFS_POSTUNINSTALL_COMMAND.
-#
-# However, that is very late, so changes made by a ROOTFS_POSTPROCESS_COMMAND
-# (like setting an empty root password) become part of the system,
-# which might not be intended in all cases.
-#
-# It would be better to do this directly after installing with
-# ROOTFS_POSTINSTALL_COMMAND += "stateless_mangle_rootfs;"
-# However, opkg then becomes unhappy and causes failures in the
-# *_manifest commands which get executed later:
-#
-# ERROR: Cannot get the installed packages list. Command '.../opkg -f .../refkit-image-minimal/1.0-r0/opkg.conf -o .../refkit-image-minimal/1.0-r0/rootfs  --force_postinstall --prefer-arch-to-version   status' returned 0 and stderr:
-# Collected errors:
-#  * file_md5sum_alloc: Failed to open file .../refkit-image-minimal/1.0-r0/rootfs/etc/hosts: No such file or directory.
-#
-# ERROR: Function failed: write_package_manifest
-#
-# TODO: why does opkg complain? /etc/hosts is listed in CONFFILES of netbase,
-# so it should be valid to remove it. If we can fix that and ensure that
-# all /etc files are marked as CONFFILES (perhaps by adding that as
-# default for all packages), then we can use ROOTFS_POSTINSTALL_COMMAND
-# again.
-ROOTFS_POSTUNINSTALL_COMMAND_append = "stateless_mangle_rootfs;"
+ROOTFS_POSTUNINSTALL_COMMAND_append = "\
+    ${@ '${STATELESS_POSTPROCESS_COMMAND} stateless_mangle_rootfs;' if oe.types.boolean(d.getVar('STATELESS_ACTIVE')) else '' } \
+"
 
 python stateless_mangle_rootfs () {
-    pn = d.getVar('PN', True)
-    if pn in (d.getVar('STATELESS_PN_WHITELIST', True) or '').split():
-        return
-
     rootfsdir = d.getVar('IMAGE_ROOTFS', True)
     docdir = rootfsdir + d.getVar('datadir', True) + '/doc/etc'
     whitelist = (d.getVar('STATELESS_ETC_WHITELIST', True) or '').split()
     stateless_mangle(d, rootfsdir, docdir,
-                     (d.getVar('STATELESS_MV_ROOTFS', True) or '').split(),
-                     (d.getVar('STATELESS_RM_ROOTFS', True) or '').split(),
+                     (d.getVar('STATELESS_MV', True) or '').split(),
+                     (d.getVar('STATELESS_RM', True) or '').split(),
                      whitelist,
                      False)
     import os

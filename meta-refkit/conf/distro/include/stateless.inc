@@ -1,54 +1,43 @@
 INHERIT += "stateless"
 
-###########################################################################
+# Gets re-created by systemd already.
+STATELESS_RM += "mtab"
 
-# Temporary overrides until IoT Reference OS Kit is fully stateless.
-
-# This entry here allows everything in /etc because IoT Reference OS Kit is
-# not actually stateless yet. We merely use the stateless.bbclass
-# to remove files from /etc which get written on the device
-# and thus must be excluded from images and, more importantly,
-# swupd bundles.
-STATELESS_ETC_WHITELIST += "*"
-
-# Empty directories must be kept.
-STATELESS_ETC_DIR_WHITELIST += "*"
-
-###########################################################################
-
-# As step towards full stateless IoT Reference OS Kit, we now
-# treat some files in /etc as conceptually read-only (i.e. neither
-# modified by the OS at runtime nor by an admin). Anything contained
-# in the rootfs directories will get bundled and added or updated when
-# running "swupd update".
-#
-# The implication is that we must keep certain files out of the rootfs
-# which do get modified at runtime, because otherwise there are
-# "swupd verify" failures.
-
-# mtab needs to be a symlink to /proc/mounts, probably forever.
-# There is no point in patching that out of binaries, nor is there
-# a need to customize it, so the symlink can remain there as read-only
-# system component.
-STATELESS_ETC_WHITELIST += "mtab"
-
-# OE-core puts some files into /etc which systemd then later overwrites
-# unconditionally via /usr/lib/tmpfile.d/etc.conf or creates dynamically
-# (machine-id). Therefore we can remove the redundant files from our rootfs
-# by not packaging them in the first place.
-STATELESS_RM_pn-systemd += " \
+# Both systemd and connman create this via tmpfiles.d. connman happens
+# to win because it connman.conf sorts before etc.conf, but that's
+# a bit brittle, so we ensure that connman wins if installed.
+STATELESS_RM += " \
     resolv.conf \
 "
+STATELESS_POSTPROCESS_COMMAND += "stateless_connman_resolv_conf;"
+stateless_connman_resolv_conf () {
+    if [ -f "${IMAGE_ROOTFS}/${libdir}/tmpfiles.d/connman.conf" ] &&
+       [ -f "${IMAGE_ROOTFS}/${libdir}/tmpfiles.d/etc.conf" ]; then
+        sed -i -e 's;^\(. /etc/resolv.conf \);# stateless: replaced by connman: \1;' \
+            "${IMAGE_ROOTFS}/${libdir}/tmpfiles.d/etc.conf"
+    fi
+}
 
-# machine-id has to be present in images at least as an empty file
-# because we might boot with the rootfs read/only. Otherwise
-# creating it during early boot fails (see
-# systemd/src/core/machine-id-setup.c).
-STATELESS_ETC_WHITELIST += "machine-id"
-
-# These files must be ignored by swupd.
-STATEFUL_FILES += "/etc/machine-id"
-SWUPD_FILE_BLACKLIST_append = " ${STATEFUL_FILES}"
+# machine-id can be removed if the rootfs and thus /etc get mounted read/write,
+# because then systemd is able to create it during early startup.
+# Beware that removing machine-id triggers systemd's FirstBootCondition,
+# which may or may not be intended because normally OE-based images
+# always boot without it.
+#
+# systemd also enables units during such a first boot according to their [Install]
+# section, which at least for wpa-supplicant turned out to be broken.
+#
+# The default is to remove machine-id when possible. This can be overriden
+# with STATELESS_ETC_WHITELIST_append = "machine-id"
+STATELESS_ETC_WHITELIST += " \
+    ${@ 'machine-id' if 'ro' in (d.getVar('APPEND') or '').split() else '' } \
+"
+STATELESS_POSTPROCESS_COMMAND += "stateless_rm_machineid; "
+stateless_rm_machineid () {
+    if ${@ bb.utils.contains('STATELESS_ETC_WHITELIST', 'machine-id', 'false', 'true', d) }; then
+        rm -f "${IMAGE_ROOTFS}${sysconfdir}/machine-id"
+    fi
+}
 
 # Depend on the installed components and thus has to be computed on
 # the device. Handled by systemd during booting or updates.
@@ -59,9 +48,8 @@ STATELESS_RM_ROOTFS += " \
 # Disable creation of /etc/ld.so.cache in images and bundles. The file
 # gets already recreated by systemd anyway when booting. Has to be
 # done by unsetting LDCONFIGDEPEND (checked by rootfs.py, which
-# creates the ld.so.cache) for all IoT Reference OS Kit images, but not the
-# refkit-initramfs, so we cannot set it unconditionally.
+# creates the ld.so.cache).
 python () {
-    if bb.data.inherits_class('refkit-image', d):
+    if oe.types.boolean(d.getVar('STATELESS_ACTIVE')):
         d.setVar('LDCONFIGDEPEND', '')
 }
