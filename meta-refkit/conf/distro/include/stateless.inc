@@ -9,12 +9,14 @@ STATELESS_RM += "mtab"
 STATELESS_RM += " \
     resolv.conf \
 "
+STATELESS_MV += "tmpfiles.d=${libdir}/tmpfiles.d"
 STATELESS_POSTPROCESS_COMMAND += "stateless_connman_resolv_conf;"
 stateless_connman_resolv_conf () {
-    if [ -f "${IMAGE_ROOTFS}/${libdir}/tmpfiles.d/connman.conf" ] &&
-       [ -f "${IMAGE_ROOTFS}/${libdir}/tmpfiles.d/etc.conf" ]; then
-        sed -i -e 's;^\(L! /etc/resolv.conf \);# stateless: replaced by connman: \1;' \
-            "${IMAGE_ROOTFS}/${libdir}/tmpfiles.d/etc.conf"
+    if ( [ -f "${IMAGE_ROOTFS}${libdir}/tmpfiles.d/connman_resolvconf.conf" ]  ||
+         [ -f "${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d/connman_resolvconf.conf" ] ) &&
+       [ -f "${IMAGE_ROOTFS}${libdir}/tmpfiles.d/etc.conf" ]; then
+        sed -i -e 's;^\(L. /etc/resolv.conf \);# stateless: replaced by connman: \1;' \
+            "${IMAGE_ROOTFS}${libdir}/tmpfiles.d/etc.conf"
     fi
 }
 
