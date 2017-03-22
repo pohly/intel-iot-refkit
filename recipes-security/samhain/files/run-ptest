@@ -1,0 +1,22 @@
+#!/bin/sh
+
+mkdir -p /tmp/testrun_samhain
+
+cd testsuit
+
+./test/test.sh  1
+#./test/test.sh  2
+./test/test.sh  3
+#./test/test.sh  4 # zlib
+./test/test.sh  5
+./test/test.sh  6
+./test/test.sh  7
+./test/test.sh  8
+#./test/test.sh  9
+#./test/test.sh  10
+gpg --import test/gnupg/public-key.asc
+./test/test.sh  11
+#./test/test.sh  12
+#./test/test.sh  13
+
+# dont' run 20-27 or all if not server
