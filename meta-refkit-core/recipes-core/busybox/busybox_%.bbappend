@@ -9,3 +9,5 @@ RRECOMMENDS_${PN}_remove_refkit-config = "${PN}-syslog"
 SRC_URI_append_refkit-config = "\
     file://refkit.cfg \
 "
+
+RPROVIDES_${PN} += "${@bb.utils.contains('DISTRO_FEATURES', 'usrmerge', '/bin/sh', '', d)}"
