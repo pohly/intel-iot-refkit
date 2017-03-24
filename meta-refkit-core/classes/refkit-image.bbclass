@@ -193,6 +193,9 @@ FEATURE_PACKAGES_computervision-test = "packagegroup-computervision-test"
 inherit ${@bb.utils.contains('DISTRO_FEATURES', 'flatpak', \
                              'flatpak-image', '', d)}
 
+inherit ${@bb.utils.contains('DISTRO_FEATURES', 'ostree', \
+                             'ostree-image', '', d)}
+
 IMAGE_LINGUAS = " "
 
 LICENSE = "MIT"
