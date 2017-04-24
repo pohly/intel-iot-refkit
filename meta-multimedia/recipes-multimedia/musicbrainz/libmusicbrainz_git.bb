@@ -5,16 +5,13 @@ LICENSE = "LGPLv2.1+"
 LIC_FILES_CHKSUM = "file://COPYING.txt;md5=fbc093901857fcd118f065f900982c24"
 DEPENDS = "expat neon neon-native"
 
-PV = "5.0.1+git${SRCPV}"
-PR = "r1"
+PV = "5.1.0+git${SRCPV}"
 
-SRCREV = "0749dd0a35b4a54316da064475863a4ac6e28e7e"
+SRCREV = "44c05779dd996035758f5ec426766aeedce29cc3"
 SRC_URI = "git://github.com/metabrainz/libmusicbrainz.git \
            file://allow-libdir-override.patch "
 
 S = "${WORKDIR}/git"
-
-LDFLAGS_prepend_libc-uclibc = " -lpthread "
 
 inherit cmake pkgconfig
 
