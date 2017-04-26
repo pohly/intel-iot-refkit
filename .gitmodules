@@ -1,27 +1,52 @@
+# url = ../intel-iot-refkit.git references submodules
+# which were copied into the intel-iot-refkit.git as separate
+# branches (see "modules/<component>/<component branch>, for
+# example "modules/openembedded-core/morty").
+#
+# When forking the main repository, remember to copy those
+# additional branches.
+#
+# The relative url works as long as main repository is called
+# "intel-iot-refkit.git". When renaming it, search/replace
+# intel-iot-refkit.git in this file with the new name.
+
 [submodule "openembedded-core"]
 	path = openembedded-core
-	url = http://git.openembedded.org/openembedded-core
-	branch = master
+	url = ../intel-iot-refkit.git
+	branch = modules/openembedded-core/master
 [submodule "bitbake"]
 	path = bitbake
-	url = http://git.openembedded.org/bitbake
-	branch = master
+	url = ../intel-iot-refkit.git
+	branch = modules/bitbake/master
 [submodule "meta-intel"]
 	path = meta-intel
-	url = https://git.yoctoproject.org/git/meta-intel
-	branch = master
+	url = ../intel-iot-refkit.git
+	branch = modules/meta-intel/master
 [submodule "meta-oic"]
 	path = meta-oic
-	url = https://git.yoctoproject.org/git/meta-oic
-	branch = master
+	url = ../intel-iot-refkit.git
+	branch = modules/meta-oic/master
 [submodule "meta-iot-web"]
 	path = meta-iot-web
-	url = https://github.com/ostroproject/meta-iot-web.git
-	branch = master
+	url = ../intel-iot-refkit.git
+	branch = modules/meta-iot-web/master
 [submodule "meta-openembedded"]
 	path = meta-openembedded
-	url = http://git.openembedded.org/meta-openembedded
-	branch = master
+	url = ../intel-iot-refkit.git
+	branch = modules/meta-openembedded
 [submodule "meta-security-isafw"]
 	path = meta-security-isafw
-	url = https://github.com/01org/meta-security-isafw.git
+	url = ../intel-iot-refkit.git
+        branch = modules/meta-security-isafw/master
+[submodule "meta-intel-realsense"]
+	path = meta-intel-realsense
+	url = ../intel-iot-refkit.git
+        branch = modules/meta-intel-realsense/master
+[submodule "meta-clang"]
+	path = meta-clang
+	url = https://github.com/kraj/meta-clang.git
+	branch = modules/meta-clang/master
+[submodule "meta-security"]
+	path = meta-security
+	url = ../intel-iot-refkit.git
+        branch = modules/meta-security/master
