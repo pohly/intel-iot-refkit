@@ -7,6 +7,7 @@ QB_DRIVE_TYPE = "/dev/vd"
 do_image_append() {
     cat > ${IMAGE_ROOTFS}/startup.nsh << EOF
 EnrollDefaultKeys
+bcfg boot dump -v
 reset
 EOF
 
