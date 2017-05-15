@@ -56,6 +56,9 @@ class ImageInstaller(oeSelfTest):
         # clean up which can result in the native tools built earlier in
         # setUpClass being unavailable.
         if not ImageInstaller.image_is_ready:
+            # The tests depend on images done in "development" mode, so set that here
+            # temporarily in a way that it overrides some other IMAGE_MODE setting in local.conf.
+            self.append_config('IMAGE_MODE_forcevariable = "development"')
             targets = 'refkit-installer-image ovmf swtpm-wrappers-native'
             print('Starting: bitbake %s' % targets)
             result = bitbake(targets)
