@@ -140,14 +140,6 @@ PACKAGECONFIG_append_pn-opencv_refkit-config = " opencl"
 # is in OE-core): swtpm_setup.sh needs netstat command.
 DEPENDS_append_pn-swtpm-wrappers-native_refkit-config = " net-tools-native"
 
-# The upstream recipe does not start tcsd automatically, but we
-# want that because the installer image calls the TPM tools
-# without starting tcsd first (it shouldn't have to!), and
-# without tcsd already running, the tools just fail. A better
-# solution would be socket-activation, but tcsd does not support
-# that. Does not matter, tcsd is only installed when needed.
-SYSTEMD_AUTO_ENABLE_forcevariable_pn-trousers_refkit-config = "enable"
-
 # usbutils depends directly on libusb1, not the obsolete compatibility. This removes dependency on libusb-compat.
 DEPENDS_remove_pn-libgphoto2_refkit-config = "virtual/libusb0"
 DEPENDS_append_pn-libgphoto2_refkit-config = " libusb1"
