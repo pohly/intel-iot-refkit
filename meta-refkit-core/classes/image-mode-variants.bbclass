@@ -3,7 +3,6 @@
 # <base recipe>-<image mode>. Because it is uncertain what is needed,
 # everything gets excluded from a world build.
 
-EXCLUDE_FROM_WORLD = "1"
 BBCLASSEXTEND += "${@ ' '.join(['image-mode:' + x for x in (d.getVar('IMAGE_MODE_VALID') or '').split()]) }"
 
 python image_mode_virtclass_handler () {
