@@ -10,4 +10,8 @@ SRC_URI_append_refkit-config = "\
     file://refkit.cfg \
 "
 
-RPROVIDES_${PN} += "${@bb.utils.contains('DISTRO_FEATURES', 'usrmerge', '/bin/sh', '', d)}"
+# If this were to stay in refkit, RPROVIDES_${PN}_append_usrmerge
+# would be better. But as the usrmerge patches are pending for
+# OE-core 2.4 M1, here we use the simpler solution and make
+# the change conditional on refkit-config.
+RPROVIDES_${PN}_append_refkit-config = "${@bb.utils.contains('DISTRO_FEATURES', 'usrmerge', ' /bin/sh', '', d)}"
