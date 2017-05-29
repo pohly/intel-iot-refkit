@@ -46,7 +46,7 @@ FEATURE_PACKAGES_dm-verity = "initramfs-framework-refkit-dm-verity${IMAGE_MODE_S
 # debug: adds debug boot parameters like 'shell' and 'debug', see
 #        meta/recipes-core/initrdscripts/initramfs-framework/debug for details
 IMAGE_FEATURES += " \
-    ${@ 'debug' if (d.getVar('IMAGE_MODE') or 'production') != 'production' else '' }"
+    ${@ 'debug' if (d.getVar('IMAGE_MODE') or 'production') != 'production' else '' } \
 "
 FEATURE_PACKAGES_debug = "initramfs-module-debug"
 
