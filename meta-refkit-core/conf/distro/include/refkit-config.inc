@@ -52,6 +52,9 @@ REFKIT_DEFAULT_DISTRO_FEATURES += "refkit-computervision"
 # "refkit-config" override.
 REFKIT_DEFAULT_DISTRO_FEATURES += "refkit-config"
 
+# Enable OSTree system update support.
+REFKIT_DEFAULT_DISTRO_FEATURES += "ostree"
+
 # Remove currently unsupported distro features from global defaults
 REFKIT_DEFAULT_DISTRO_FEATURES_REMOVE += "x11 3g"
 
