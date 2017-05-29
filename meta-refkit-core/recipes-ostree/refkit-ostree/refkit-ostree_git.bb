@@ -30,3 +30,5 @@ SYSTEMD_SERVICE_${PN} = " \
 EXTRA_OECONF += " \
             --with-systemdunitdir=${systemd_unitdir} \
 "
+
+RDEPENDS_${PN} += "ostree"
