@@ -16,12 +16,7 @@ ostree_enabled () {
 
 # Print a fatal error message, starting a shell if we're in development mode.
 ostree_fatal () {
-    if grep -q "imagetype=development" /proc/cmdline; then
-        error "ostree: $*"
-        /bin/sh
-    else
-        fatal "ostree: $*"
-    fi
+    fatal "ostree: $*"
 }
 
 # Print an info message.
