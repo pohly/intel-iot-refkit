@@ -20,13 +20,13 @@ PACKAGE_INSTALL += "initramfs-module-udev"
 # Could be removed in more minimal product image.
 PACKAGE_INSTALL += "initramfs-module-debug"
 
-# Do not pollute the initrd image with rootfs features
-IMAGE_FEATURES = ""
-
 # Create variants of this recipe for each image mode. Each variant
 # depends on a specific variant of initramfs-framework-refkit-dm-verity.
 IMAGE_MODE_VALID = "${REFKIT_IMAGE_MODE_VALID}"
 inherit image-mode-variants
+
+# Do not pollute the initrd image with rootfs features
+IMAGE_FEATURES = ""
 
 # Instead we have additional image feature(s).
 IMAGE_FEATURES[validitems] += " \
