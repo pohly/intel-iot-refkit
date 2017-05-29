@@ -278,10 +278,8 @@ INITRD_IMAGE_intel-core2-32 = "${REFKIT_INITRAMFS}"
 INITRD_IMAGE_intel-corei7-64 = "${REFKIT_INITRAMFS}"
 INITRD_IMAGE_intel-quark = "${REFKIT_INITRAMFS}"
 
-# Mark this image as development on the kernel command line. Can be used
-# for things like automatically offering a debug shell from initramfs
-# modules upon fatal errors, etc.
-APPEND_append = "${@ ' imagetype=development' if (d.getVar('IMAGE_MODE') or '') == 'development' else ''}"
+# Enable emergency shell in initramfs-framework.
+APPEND_append = "${@ ' init_fatal_sh' if (d.getVar('IMAGE_MODE') or '') == 'development' else ''}"
 
 # The expected disk layout is not compatible with the HDD format:
 # HDD places the rootfs as loop file in a VFAT partition (UEFI),
