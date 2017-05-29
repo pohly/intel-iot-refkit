@@ -9,7 +9,9 @@ SRC_URI = " \
 
 SRCREV = "a196e93ed90b65f21e496aa566d17b06484fcc45"
 
-inherit autotools systemd
+inherit autotools systemd distro_features_check
+
+REQUIRED_DISTRO_FEATURES = "ostree systemd"
 
 S = "${WORKDIR}/git"
 
