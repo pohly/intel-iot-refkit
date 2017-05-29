@@ -22,9 +22,9 @@ IMAGE_FEATURES[validitems] += " \
     ostree \
 "
 
-# Declare a packagegroup with all the bits for the ostree image features.
+# rekit-ostree RDEPENDS on ostree, so we don't need to list that here.
 FEATURE_PACKAGES_ostree = " \
-    packagegroup-ostree \
+    refkit-ostree \
 "
 
 #
@@ -77,7 +77,6 @@ fakeroot do_ostree_prepare_rootfs () {
     TMPDIR="${@d.getVar('TMPDIR')}"
     IMAGE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}"
     IMAGE_BASENAME="${@d.getVar('IMAGE_BASENAME')}"
-    OSTREEBASE="${@d.getVar('OSTREEBASE')}"
     OSTREE_REPO="${@d.getVar('OSTREE_REPO')}"
     OSTREE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}.ostree"
     OSTREE_EXPORT="${@d.getVar('OSTREE_EXPORT')}"
@@ -91,7 +90,6 @@ fakeroot do_ostree_prepare_rootfs () {
     echo "TMPDIR=$TMPDIR"
     echo "IMAGE_ROOTFS=$IMAGE_ROOTFS"
     echo "IMAGE_BASENAME=$IMAGE_BASENAME"
-    echo "OSTREEBASE=$OSTREEBASE"
     echo "OSTREE_REPO=$OSTREE_REPO"
     echo "OSTREE_ROOTFS=$OSTREE_ROOTFS"
     echo "OSTREE_EXPORT=$OSTREE_EXPORT"
@@ -109,7 +107,8 @@ fakeroot do_ostree_prepare_rootfs () {
     fi
 
     # Generate repository signing GPG keys, if we don't have them yet.
-    $OSTREEBASE/scripts/gpg-keygen.sh \
+    # TODO: replace with pre-generated keys in the repo instead of depending on meta-flatpak?
+    ${FLATPAKBASE}/scripts/gpg-keygen.sh \
         --home $OSTREE_GPGDIR \
         --id $OSTREE_GPGID \
         --base "${OSTREE_GPGID%%@*}"
@@ -135,7 +134,7 @@ fakeroot do_ostree_prepare_rootfs () {
         remote=""
     fi
 
-    $OSTREEBASE/scripts/mk-ostree.sh -v -v \
+    ${META_REFKIT_CORE_BASE}/scripts/mk-ostree.sh -v -v \
         --distro $DISTRO \
         --arch $OSTREE_ARCH \
         --machine $MACHINE \
@@ -169,7 +168,6 @@ fakeroot do_ostree_publish_rootfs () {
     TMPDIR="${@d.getVar('TMPDIR')}"
     IMAGE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}"
     IMAGE_BASENAME="${@d.getVar('IMAGE_BASENAME')}"
-    OSTREEBASE="${@d.getVar('OSTREEBASE')}"
     OSTREE_REPO="${@d.getVar('OSTREE_REPO')}"
     OSTREE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}.ostree"
     OSTREE_EXPORT="${@d.getVar('OSTREE_EXPORT')}"
@@ -183,7 +181,6 @@ fakeroot do_ostree_publish_rootfs () {
     echo "TMPDIR=$TMPDIR"
     echo "IMAGE_ROOTFS=$IMAGE_ROOTFS"
     echo "IMAGE_BASENAME=$IMAGE_BASENAME"
-    echo "OSTREEBASE=$OSTREEBASE"
     echo "OSTREE_REPO=$OSTREE_REPO"
     echo "OSTREE_ROOTFS=$OSTREE_ROOTFS"
     echo "OSTREE_EXPORT=$OSTREE_EXPORT"
@@ -202,7 +199,7 @@ fakeroot do_ostree_publish_rootfs () {
         return 0
     fi
 
-    $OSTREEBASE/scripts/mk-ostree.sh -v -v \
+    ${META_REFKIT_CORE_BASE}/scripts/mk-ostree.sh -v -v \
         --distro $DISTRO \
         --arch $OSTREE_ARCH \
         --machine $MACHINE \
