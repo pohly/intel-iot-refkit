@@ -104,6 +104,9 @@ def refkit_swupd_image_class(d):
 # Here we optionally inherit refkit-swupd-image.bbclass, which configures and activates swupd.
 inherit ${@refkit_swupd_image_class(d)}
 
+# Optionally inherit OSTree system update support.
+inherit ${@bb.utils.contains('DISTRO_FEATURES', 'ostree', 'ostree-image', '', d)}
+
 # When using dm-verity, the rootfs has to be read-only.
 # An extra partition gets created by wic which holds the
 # hash data for the rootfs partition, including a signed
