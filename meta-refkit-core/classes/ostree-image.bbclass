@@ -49,8 +49,9 @@ BBCLASSEXTEND += "imagevariant:ostree"
 # primary per-build OSTree repository and machine architecture to use
 # in tagging versions in the repository. These are not meant to be
 # overridden.
-OSTREEBASE    = "${FLATPAKBASE}"
 OSTREE_ROOTFS = "${IMAGE_ROOTFS}.ostree"
+# TODO: does this really need to be in ${DEPLOY_DIR_IMAGE}? Probably not,
+# as it is intermediate output.
 OSTREE_REPO   = "${DEPLOY_DIR_IMAGE}/${IMAGE_NAME}.ostree"
 OSTREE_ARCH   = "${@d.getVar('TARGET_ARCH_MULTILIB_ORIGINAL') \
                        if d.getVar('MPLPREFIX') else d.getVar('TARGET_ARCH')}"
@@ -58,6 +59,10 @@ OSTREE_ARCH   = "${@d.getVar('TARGET_ARCH_MULTILIB_ORIGINAL') \
 # This is where we export our builds in archive-z2 format. This repository
 # can be exposed over HTTP for clients to pull in upgrades from. By default
 # it goes under the top build directory.
+# TODO: put that into ${DEPLOY_DIR_IMAGE} and provide instructions on how
+# to publish permanently? That would be consistent with how "tmp/deploy" is
+# used.
+# TODO: share the same repo between different images and architectures?
 OSTREE_EXPORT ?= "${TOPDIR}/${IMAGE_BASENAME}.ostree"
 
 # This is where our GPG keyring is generated/located at and the default
@@ -71,20 +76,13 @@ OSTREE_REMOTE ?= "${@'http://updates.refkit.org/ostree/' + \
 
 # Check if we have an unchanged image and an already existing repo for it.
 image_repo () {
-    DEPLOY_DIR_IMAGE="${@d.getVar('DEPLOY_DIR_IMAGE')}"
-    IMAGE_NAME="${@d.getVar('IMAGE_NAME')}"
-    IMAGE_BASENAME="${@d.getVar('IMAGE_BASENAME')}"
-    IMAGE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}"
-    MACHINE="${@d.getVar('MACHINE')}"
-    ROOTFS_VERSION="$(cat $IMAGE_ROOTFS/etc/version)"
+    version="$(cat ${IMAGE_ROOTFS}/etc/version)"
+    repo="${DEPLOY_DIR_IMAGE}/${IMAGE_BASENAME}-${MACHINE}-$version.ostree"
 
-    OSTREE_REPO="${@d.getVar('OSTREE_REPO')}"
-    IMAGE_REPO="$DEPLOY_DIR_IMAGE/$IMAGE_BASENAME-$MACHINE-$VERSION.ostree"
-
-    if [ -d $IMAGE_REPO ]; then
-        echo $IMAGE_REPO
+    if [ -d $image_repo ]; then
+        echo $repo
     else
-        echo $OSTREE_REPO
+        echo ${OSTREE_REPO}
     fi
 }
 
@@ -93,143 +91,91 @@ image_repo () {
 # repository, and finally produce an OSTree-enabled rootfs by cloning
 # and checking out the rootfs as an OSTree deployment.
 fakeroot do_ostree_prepare_rootfs () {
-    DISTRO="${@d.getVar('DISTRO')}"
-    MACHINE="${@d.getVar('MACHINE')}"
-    TMPDIR="${@d.getVar('TMPDIR')}"
-    IMAGE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}"
-    IMAGE_BASENAME="${@d.getVar('IMAGE_BASENAME')}"
-    OSTREE_REPO="${@d.getVar('OSTREE_REPO')}"
-    OSTREE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}.ostree"
-    OSTREE_EXPORT="${@d.getVar('OSTREE_EXPORT')}"
-    OSTREE_ARCH="${@d.getVar('OSTREE_ARCH')}"
-    OSTREE_GPGDIR="${@d.getVar('OSTREE_GPGDIR')}"
-    OSTREE_GPGID="${@d.getVar('OSTREE_GPGID')}"
-    OSTREE_REMOTE="${@d.getVar('OSTREE_REMOTE')}"
-
-    echo "DISTRO=$DISTRO"
-    echo "MACHINE=$MACHINE"
-    echo "TMPDIR=$TMPDIR"
-    echo "IMAGE_ROOTFS=$IMAGE_ROOTFS"
-    echo "IMAGE_BASENAME=$IMAGE_BASENAME"
-    echo "OSTREE_REPO=$OSTREE_REPO"
-    echo "OSTREE_ROOTFS=$OSTREE_ROOTFS"
-    echo "OSTREE_EXPORT=$OSTREE_EXPORT"
-    echo "OSTREE_ARCH=$OSTREE_ARCH"
-    echo "OSTREE_GPGDIR=$OSTREE_GPGDIR"
-    echo "OSTREE_GPGID=$OSTREE_GPGID"
-    echo "OSTREE_REMOTE=${OSTREE_REMOTE:-none}"
-
-    # bail out if this does not look like an -ostree image variant
-    if ${@bb.utils.contains('IMAGE_FEATURES','ostree', 'true','false', d)}; then
-        echo "OSTree: image $IMAGE_BASENAME is an ostree variant"
-    else
-        echo "OSTree: image $IMAGE_BASENAME is not an ostree variant"
-        return 0
-    fi
-
     # Generate repository signing GPG keys, if we don't have them yet.
     # TODO: replace with pre-generated keys in the repo instead of depending on meta-flatpak?
+    base=${@ '${OSTREE_GPGID}'.split('@')[0]}
+    pubkey=$base.pub
     ${FLATPAKBASE}/scripts/gpg-keygen.sh \
-        --home $OSTREE_GPGDIR \
-        --id $OSTREE_GPGID \
-        --base "${OSTREE_GPGID%%@*}"
+        --home ${OSTREE_GPGDIR} \
+        --id ${OSTREE_GPGID} \
+        --base $base
 
     # Save (signing) public key for the repo.
-    pubkey=${OSTREE_GPGID%%@*}.pub
     if [ ! -e ${IMGDEPLOYDIR}/$pubkey -a -e ${TOPDIR}/$pubkey ]; then
-        echo "Saving OSTree repository signing key $pubkey"
+        bbnote "Saving OSTree repository signing key $pubkey"
         cp -v ${TOPDIR}/$pubkey ${IMGDEPLOYDIR}
     fi
 
-    IMAGE_REPO=$(image_repo)
+    repo=$(image_repo)
 
-    if [ "$IMAGE_REPO" != "$OSTREE_REPO" ]; then
-        echo "Symlinking to existing image repo $IMAGE_REPO..."
-        ln -s $IMAGE_REPO $OSTREE_REPO
+    if [ $repo != ${OSTREE_REPO} ]; then
+        bbnote "Symlinking to existing image repo $repo..."
+        ln -s $repo ${OSTREE_REPO}
         return 0
     fi
 
-    if [ -n "$OSTREE_REMOTE" ]; then
-        remote="--remote $OSTREE_REMOTE"
+    if [ -n "${OSTREE_REMOTE}" ]; then
+        remote="--remote ${OSTREE_REMOTE}"
     else
         remote=""
     fi
 
     ${META_REFKIT_CORE_BASE}/scripts/mk-ostree.sh -v -v \
-        --distro $DISTRO \
-        --arch $OSTREE_ARCH \
-        --machine $MACHINE \
-        --src $IMAGE_ROOTFS \
-        --dst $OSTREE_ROOTFS \
-        --repo $OSTREE_REPO \
-        --export $OSTREE_EXPORT \
-        --tmpdir $TMPDIR \
-        --gpg-home $OSTREE_GPGDIR \
-        --gpg-id $OSTREE_GPGID \
+        --distro "${DISTRO}" \
+        --arch ${OSTREE_ARCH} \
+        --machine ${MACHINE} \
+        --src ${IMAGE_ROOTFS} \
+        --dst ${OSTREE_ROOTFS} \
+        --repo ${OSTREE_REPO} \
+        --export ${OSTREE_EXPORT} \
+        --tmpdir ${TMPDIR} \
+        --gpg-home ${OSTREE_GPGDIR} \
+        --gpg-id ${OSTREE_GPGID} \
         $remote \
         --overwrite \
         prepare-sysroot export-repo
 }
 
+# TODO: ostree-native depends on ca-certificates,
+# and is probably affected by https://bugzilla.yoctoproject.org/show_bug.cgi?id=9883.
+# At least there are warnings in log.do_ostree_prepare_rootfs:
+# (ostree:42907): GLib-Net-WARNING **: couldn't load TLS file database: Failed to open file '/fast/build/refkit/intel-corei7-64/tmp-glibc/work/x86_64-linux/glib-networking-native/2.50.0-r0/recipe-sysroot-native/etc/ssl/certs/ca-certificates.crt': No such file or directory
 do_ostree_prepare_rootfs[depends] += " \
     binutils-native:do_populate_sysroot \
     ostree-native:do_populate_sysroot \
 "
 
-addtask do_ostree_prepare_rootfs after do_rootfs before do_image
-
-
 # Take a per-build OSTree bare-user repository and export it to an
 # archive-z2 repository which can then be exposed over HTTP for
 # OSTree clients to pull in upgrades from.
 fakeroot do_ostree_publish_rootfs () {
-    DISTRO="${@d.getVar('DISTRO')}"
-    OS_VERSION="${@d.getVar('OS_VERSION')}"
-    MACHINE="${@d.getVar('MACHINE')}"
-    TMPDIR="${@d.getVar('TMPDIR')}"
-    IMAGE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}"
-    IMAGE_BASENAME="${@d.getVar('IMAGE_BASENAME')}"
-    OSTREE_REPO="${@d.getVar('OSTREE_REPO')}"
-    OSTREE_ROOTFS="${@d.getVar('IMAGE_ROOTFS')}.ostree"
-    OSTREE_EXPORT="${@d.getVar('OSTREE_EXPORT')}"
-    OSTREE_ARCH="${@d.getVar('OSTREE_ARCH')}"
-    OSTREE_GPGDIR="${@d.getVar('OSTREE_GPGDIR')}"
-    OSTREE_GPGID="${@d.getVar('OSTREE_GPGID')}"
-
-    echo "DISTRO=$DISTRO"
-    echo "OS_VERSION=$OS_VERSION"
-    echo "MACHINE=$MACHINE"
-    echo "TMPDIR=$TMPDIR"
-    echo "IMAGE_ROOTFS=$IMAGE_ROOTFS"
-    echo "IMAGE_BASENAME=$IMAGE_BASENAME"
-    echo "OSTREE_REPO=$OSTREE_REPO"
-    echo "OSTREE_ROOTFS=$OSTREE_ROOTFS"
-    echo "OSTREE_EXPORT=$OSTREE_EXPORT"
-    echo "OSTREE_ARCH=$OSTREE_ARCH"
-    echo "OSTREE_GPGDIR=$OSTREE_GPGDIR"
-    echo "OSTREE_GPGID=$OSTREE_GPGID"
-
-    # bail out if this does not look like an -ostree image variant or we're
-    # not supposed to publish
-    if ${@bb.utils.contains('IMAGE_FEATURES','ostree', 'false','true', d)}; then
-        return 0
-    fi
-
-    if [ -z "${@d.getVar('OSTREE_EXPORT')}" ]; then
-        echo "OSTree: OSTREE_EXPORT repository not set, not publishing."
+    if [ ! "${OSTREE_EXPORT}" ]; then
+        bbnote "OSTree: OSTREE_EXPORT repository not set, not publishing."
         return 0
     fi
 
     ${META_REFKIT_CORE_BASE}/scripts/mk-ostree.sh -v -v \
-        --distro $DISTRO \
-        --arch $OSTREE_ARCH \
-        --machine $MACHINE \
-        --repo $OSTREE_REPO \
-        --export $OSTREE_EXPORT \
-        --gpg-home $OSTREE_GPGDIR \
-        --gpg-id $OSTREE_GPGID \
+        --distro ${DISTRO} \
+        --arch ${OSTREE_ARCH} \
+        --machine ${MACHINE} \
+        --repo ${OSTREE_REPO} \
+        --export ${OSTREE_EXPORT} \
+        --gpg-home ${OSTREE_GPGDIR} \
+        --gpg-id ${OSTREE_GPGID} \
         --overwrite \
         export-repo
 }
 
-addtask do_ostree_publish_rootfs after do_ostree_prepare_rootfs before do_image
+python () {
+    # Don't do anything when OSTree image feature is off.
+    if bb.utils.contains('IMAGE_FEATURES', 'ostree', True, False, d):
+        # TODO: we must do this after do_image, because do_image
+        # is still allowed to make changes to the files (for example,
+        # prelink_image in IMAGE_PREPROCESS_COMMAND)
+        #
+        # We rely on wic to produce the actual images, so we could do
+        # after do_image before do_image_wic here.
+        bb.build.addtask('do_ostree_prepare_rootfs', 'do_image', 'do_rootfs', d)
+        # TODO: is this obsolete?
+        bb.build.addtask('do_ostree_publish_rootfs', 'do_image', 'do_ostree_prepare_rootfs', d)
+}
