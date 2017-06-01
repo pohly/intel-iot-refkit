@@ -8,10 +8,7 @@
 # By default, the full image is meant to fit into 4*10^9 bytes, i.e.
 # "4GB" regardless whether 1000 or 1024 is used as base. 64M are reserved
 # for potential partitioning overhead.
-WKS_FILE = " \
-    refkit-directdisk${@bb.utils.contains('IMAGE_FEATURES', 'ostree', \
-                                                 '-ostree', '', d)}.wks.in \
-"
+WKS_FILE = "refkit-directdisk.wks.in"
 REFKIT_VFAT_MB ??= "64"
 REFKIT_IMAGE_SIZE ??= "--fixed-size 3622M"
 REFKIT_EXTRA_PARTITION ??= ""
