@@ -29,6 +29,7 @@ print_usage () {
     echo "The possible options are:"
     echo "  --distro <name>       distribution name to use within OSTree"
     echo "  --arch <arch>         architecture the image is compiled for"
+    echo "  --branch <branch>     branch to which the image will be committed"
     echo "  --src <dir>           pristine rootfs to use as input"
     echo "  --dst <dir>           OSTree rootfs directory to produce"
     echo "  --repo <repo>         bare-user repository to genrtate"
@@ -156,6 +157,10 @@ parse_cmdline () {
                     ;;
                 --arch|-A)
                     ARCH="$2"
+                    shift 2
+                    ;;
+                --branch|-B)
+                    OSTREE_BRANCH="$2"
                     shift 2
                     ;;
                 --src|-s|--source|--sysroot|--pristine-sysroot)
@@ -291,7 +296,9 @@ parse_cmdline () {
         *)        UEFIAPP=boot$ARCH.efi;; # Well, not...
     esac
 
-    OSTREE_BRANCH=$DISTRO/$ARCH/standard
+    if [ -z "$OSTREE_BRANCH" ]; then
+        OSTREE_BRANCH=$DISTRO/$ARCH/standard
+    fi
 
     if [ -z "$COMMIT_SUBJECT" ]; then
         COMMIT_SUBJECT="Build of $DISTRO @ $(date +'%Y-%m-%d %H:%m:%S')"

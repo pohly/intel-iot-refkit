@@ -56,6 +56,9 @@ OSTREE_REPO   = "${DEPLOY_DIR_IMAGE}/${IMAGE_NAME}.ostree"
 OSTREE_ARCH   = "${@d.getVar('TARGET_ARCH_MULTILIB_ORIGINAL') \
                        if d.getVar('MPLPREFIX') else d.getVar('TARGET_ARCH')}"
 
+# Each image is committed to its own, unique branch.
+OSTREE_BRANCH ?= "${DISTRO}/${MACHINE}/${PN}"
+
 # This is where we export our builds in archive-z2 format. This repository
 # can be exposed over HTTP for clients to pull in upgrades from. By default
 # it goes under the top build directory.
@@ -124,6 +127,7 @@ fakeroot do_ostree_prepare_rootfs () {
         --distro "${DISTRO}" \
         --arch ${OSTREE_ARCH} \
         --machine ${MACHINE} \
+        --branch ${OSTREE_BRANCH} \
         --src ${IMAGE_ROOTFS} \
         --dst ${OSTREE_ROOTFS} \
         --repo ${OSTREE_REPO} \
@@ -158,6 +162,7 @@ fakeroot do_ostree_publish_rootfs () {
         --distro ${DISTRO} \
         --arch ${OSTREE_ARCH} \
         --machine ${MACHINE} \
+        --branch ${OSTREE_BRANCH} \
         --repo ${OSTREE_REPO} \
         --export ${OSTREE_EXPORT} \
         --gpg-home ${OSTREE_GPGDIR} \
