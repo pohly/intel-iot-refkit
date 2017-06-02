@@ -463,11 +463,11 @@ checkout_sysroot () {
 
     info "Replicating primary OSTree repository into OSTree sysroot..."
     ostree --repo=$OSTREE_SYSROOT/ostree/repo pull-local \
-        --remote=$DISTRO $SYSROOT_REPO $OSTREE_BRANCH
+        --remote=updates $SYSROOT_REPO $OSTREE_BRANCH
 
     info "Deploying rootfs from OSTree sysroot repository..."
     ostree admin --sysroot=$OSTREE_SYSROOT deploy \
-        --os=$DISTRO $DISTRO:$OSTREE_BRANCH
+        --os=$DISTRO updates:$OSTREE_BRANCH
 
     if [ -n "$OSTREE_REMOTE" ]; then
         info "Setting OSTree remote to $REMOTE_URL..."
