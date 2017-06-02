@@ -123,6 +123,10 @@ fakeroot do_ostree_prepare_rootfs () {
         --overwrite \
         prepare-sysroot export-repo
 }
+# .pub/.sec keys get created in the current directory, so
+# we have to be careful to always run from the same directory,
+# regardless of the image.
+do_ostree_prepare_rootfs[dirs] = "${TOPDIR}"
 
 def get_file_list(filenames):
     filelist = []
