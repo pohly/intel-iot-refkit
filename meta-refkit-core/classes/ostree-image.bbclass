@@ -51,6 +51,12 @@ BBCLASSEXTEND += "imagevariant:ostree"
 # overridden.
 OSTREE_ROOTFS = "${IMAGE_ROOTFS}.ostree"
 OSTREE_REPO   = "${WORKDIR}/ostree-repo"
+# TODO: this is used only to determine the EFI boot*.efi name (bootx86.efi).
+# Replace with direct selection of the boot*.efi name here? Then it
+# can be made configurable for other architectures.
+#
+# We cannot use it for the branch name because it is too unspecific (different
+# machines sharing the same arch would end up using the same branch).
 OSTREE_ARCH   = "${@d.getVar('TARGET_ARCH_MULTILIB_ORIGINAL') \
                        if d.getVar('MPLPREFIX') else d.getVar('TARGET_ARCH')}"
 
