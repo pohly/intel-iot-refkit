@@ -50,9 +50,7 @@ BBCLASSEXTEND += "imagevariant:ostree"
 # in tagging versions in the repository. These are not meant to be
 # overridden.
 OSTREE_ROOTFS = "${IMAGE_ROOTFS}.ostree"
-# TODO: does this really need to be in ${DEPLOY_DIR_IMAGE}? Probably not,
-# as it is intermediate output.
-OSTREE_REPO   = "${DEPLOY_DIR_IMAGE}/${IMAGE_NAME}.ostree"
+OSTREE_REPO   = "${WORKDIR}/ostree-repo"
 OSTREE_ARCH   = "${@d.getVar('TARGET_ARCH_MULTILIB_ORIGINAL') \
                        if d.getVar('MPLPREFIX') else d.getVar('TARGET_ARCH')}"
 
@@ -60,13 +58,19 @@ OSTREE_ARCH   = "${@d.getVar('TARGET_ARCH_MULTILIB_ORIGINAL') \
 OSTREE_BRANCH ?= "${DISTRO}/${MACHINE}/${PN}"
 
 # This is where we export our builds in archive-z2 format. This repository
-# can be exposed over HTTP for clients to pull in upgrades from. By default
-# it goes under the top build directory.
-# TODO: put that into ${DEPLOY_DIR_IMAGE} and provide instructions on how
-# to publish permanently? That would be consistent with how "tmp/deploy" is
-# used.
-# TODO: share the same repo between different images and architectures?
-OSTREE_EXPORT ?= "${TOPDIR}/${IMAGE_BASENAME}.ostree"
+# can be exposed over HTTP for clients to pull upgrades from. It can be
+# shared between different distributions, architectures and images
+# because each image has its own branch in the common repository.
+#
+# Beware that this repo is under TMPDIR by default. Just like other
+# build output it should be moved to a permanent location if it
+# is meant to be preserved after a successful build (for example,
+# with "ostree pull-local" in a permanent repo), or the variable
+# needs to point towards an external directory which exists
+# across builds.
+#
+# This can be set to an empty string to disable publishing.
+OSTREE_EXPORT ?= "${DEPLOY_DIR}/ostree-repo"
 
 # This is where our GPG keyring is generated/located at and the default
 # key ID we use to sign (commits in) the repository.
