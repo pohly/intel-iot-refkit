@@ -78,9 +78,8 @@ OSTREE_GPGDIR ?= "${TOPDIR}/gpg"
 OSTREE_GPGID  ?= "${@d.getVar('DISTRO').replace(' ', '_') + '-signing@key'}"
 
 # OSTree remote (HTTP URL) where updates will be published.
-OSTREE_REMOTE ?= "${@'http://updates.refkit.org/ostree/' + \
-                        d.getVar('IMAGE_BASENAME').split('-ostree')[0]}"
-
+# Host the content of OSTREE_EXPORT there.
+OSTREE_REMOTE ?= "https://update.example.org/ostree/"
 
 # Take a pristine rootfs as input, shuffle its layout around to make it
 # OSTree-compatible, commit the rootfs into a per-build bare-user OSTree
