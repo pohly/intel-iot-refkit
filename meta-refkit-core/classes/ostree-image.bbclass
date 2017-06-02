@@ -172,13 +172,14 @@ fakeroot do_ostree_publish_rootfs () {
 python () {
     # Don't do anything when OSTree image feature is off.
     if bb.utils.contains('IMAGE_FEATURES', 'ostree', True, False, d):
-        # TODO: we must do this after do_image, because do_image
+        # We must do this after do_image, because do_image
         # is still allowed to make changes to the files (for example,
         # prelink_image in IMAGE_PREPROCESS_COMMAND)
         #
-        # We rely on wic to produce the actual images, so we could do
-        # after do_image before do_image_wic here.
-        bb.build.addtask('do_ostree_prepare_rootfs', 'do_image', 'do_rootfs', d)
-        # TODO: is this obsolete?
-        bb.build.addtask('do_ostree_publish_rootfs', 'do_image', 'do_ostree_prepare_rootfs', d)
+        # We rely on wic to produce the actual images, so we inject our
+        # custom rootfs creation task right before that.
+        bb.build.addtask('do_ostree_prepare_rootfs', 'do_image_wic', 'do_image', d)
+
+        # Publishing can run in parallel to wic image creation.
+        bb.build.addtask('do_ostree_publish_rootfs', 'do_image_complete', 'do_ostree_prepare_rootfs', d)
 }
