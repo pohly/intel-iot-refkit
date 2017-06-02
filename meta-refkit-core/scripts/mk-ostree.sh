@@ -476,6 +476,37 @@ checkout_sysroot () {
                updates \
                $REMOTE_URL
     fi
+
+    # TODO: initialize /ostree/deploy/refkit/var/ from original rootfs
+#tmp-glibc/work/intel_corei7_64-refkit-linux/refkit-image-common-ostree/1.0-r0/rootfs.ostree/ostree/deploy/refkit/var/
+#├── lib
+#├── lock -> ../run/lock
+#├── log
+#├── run -> ../run
+#└── tmp
+
+#tmp-glibc/work/intel_corei7_64-refkit-linux/refkit-image-common-ostree/1.0-r0/rootfs/var/
+#├── backups
+#├── cache
+#│   └── opkg
+#├── lib
+#│   ├── alsa
+#│   │   └── asound.state
+#│   ├── dbus
+#│   ├── misc
+#│   ├── opkg
+#│   ├── systemd
+#│   └── tpm
+#├── local
+#├── lock -> ../run/lock
+#├── log -> volatile/log
+#├── run -> ../run
+#├── spool
+#│   └── mail
+#├── tmp -> volatile/tmp
+#└── volatile
+
+
 }
 
 # Finalize the physical root directory after the ostree checkout.
