@@ -81,17 +81,6 @@ OSTREE_GPGID  ?= "${@d.getVar('DISTRO').replace(' ', '_') + '-signing@key'}"
 OSTREE_REMOTE ?= "${@'http://updates.refkit.org/ostree/' + \
                         d.getVar('IMAGE_BASENAME').split('-ostree')[0]}"
 
-# Check if we have an unchanged image and an already existing repo for it.
-image_repo () {
-    version="$(cat ${IMAGE_ROOTFS}/etc/version)"
-    repo="${DEPLOY_DIR_IMAGE}/${IMAGE_BASENAME}-${MACHINE}-$version.ostree"
-
-    if [ -d $image_repo ]; then
-        echo $repo
-    else
-        echo ${OSTREE_REPO}
-    fi
-}
 
 # Take a pristine rootfs as input, shuffle its layout around to make it
 # OSTree-compatible, commit the rootfs into a per-build bare-user OSTree
@@ -111,14 +100,6 @@ fakeroot do_ostree_prepare_rootfs () {
     if [ ! -e ${IMGDEPLOYDIR}/$pubkey -a -e ${TOPDIR}/$pubkey ]; then
         bbnote "Saving OSTree repository signing key $pubkey"
         cp -v ${TOPDIR}/$pubkey ${IMGDEPLOYDIR}
-    fi
-
-    repo=$(image_repo)
-
-    if [ $repo != ${OSTREE_REPO} ]; then
-        bbnote "Symlinking to existing image repo $repo..."
-        ln -s $repo ${OSTREE_REPO}
-        return 0
     fi
 
     if [ -n "${OSTREE_REMOTE}" ]; then
