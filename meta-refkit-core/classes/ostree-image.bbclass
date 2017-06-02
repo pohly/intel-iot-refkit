@@ -115,13 +115,12 @@ fakeroot do_ostree_prepare_rootfs () {
         --src ${IMAGE_ROOTFS} \
         --dst ${OSTREE_ROOTFS} \
         --repo ${OSTREE_REPO} \
-        --export ${OSTREE_EXPORT} \
         --tmpdir ${TMPDIR} \
         --gpg-home ${OSTREE_GPGDIR} \
         --gpg-id ${OSTREE_GPGID} \
         $remote \
         --overwrite \
-        prepare-sysroot export-repo
+        prepare-sysroot
 }
 # .pub/.sec keys get created in the current directory, so
 # we have to be careful to always run from the same directory,
