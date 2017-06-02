@@ -125,6 +125,17 @@ fakeroot do_ostree_prepare_rootfs () {
         prepare-sysroot export-repo
 }
 
+def get_file_list(filenames):
+    filelist = []
+    for filename in filenames:
+        filelist.append(filename + ":" + str(os.path.exists(filename)))
+    return ' '.join(filelist)
+
+do_ostree_prepare_rootfs[file-checksums] += "${@get_file_list(( \
+   '${META_REFKIT_CORE_BASE}/scripts/mk-ostree.sh', \
+   '${FLATPAKBASE}/scripts/gpg-keygen.sh', \
+))}"
+
 # TODO: ostree-native depends on ca-certificates,
 # and is probably affected by https://bugzilla.yoctoproject.org/show_bug.cgi?id=9883.
 # At least there are warnings in log.do_ostree_prepare_rootfs:
