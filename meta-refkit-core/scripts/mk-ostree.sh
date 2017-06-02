@@ -469,10 +469,12 @@ checkout_sysroot () {
     ostree admin --sysroot=$OSTREE_SYSROOT deploy \
         --os=$DISTRO updates:$OSTREE_BRANCH
 
-    if [ -n "$OSTREE_REMOTE" ]; then
+    if [ -n "$REMOTE_URL" ]; then
         info "Setting OSTree remote to $REMOTE_URL..."
-        ostree admin --sysroot=$OSTREE_SYSROOT set-origin \
-            $DISTRO $REMOTE_URL
+        ostree remote add --repo=$OSTREE_SYSROOT/ostree/repo \
+               --gpg-import=$GPG_HOME/pubring.gpg \
+               updates \
+               $REMOTE_URL
     fi
 }
 
