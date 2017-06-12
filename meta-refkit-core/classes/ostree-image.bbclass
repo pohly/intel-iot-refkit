@@ -44,6 +44,10 @@ IMAGE_VARIANT[ostree] = "ostree"
 
 BBCLASSEXTEND += "imagevariant:ostree"
 
+# Additional sanity checking. Complements ostree-sanity in INHERIT.
+REQUIRED_DISTRO_FEATURES += "ostree usrmerge"
+inherit distro_features_check
+
 ###########################################################################
 
 # These are our top layer directory, OSTree-compatible rootfs path,
