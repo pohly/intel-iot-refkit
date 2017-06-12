@@ -1,7 +1,8 @@
 # Support for OSTree-upgradable images.
 #
 # This class adds support for building ostree image variants. It is an
-# addeddum to refkit-image.bbclass and is supposed to be inherited by it.
+# addendum to refkit-image.bbclass and is supposed to be inherited by it
+# conditionally when the "ostree" distro feature is set.
 #
 # An ostree image variant adds to the base image bitbake-time support for
 #
