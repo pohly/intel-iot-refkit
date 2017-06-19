@@ -83,10 +83,22 @@ OSTREE_BRANCH ?= "${DISTRO}/${MACHINE}/${PN}"
 # This can be set to an empty string to disable publishing.
 OSTREE_EXPORT ?= "${DEPLOY_DIR}/ostree-repo"
 
-# This is where our GPG keyring is generated/located at and the default
-# key ID we use to sign (commits in) the repository.
-OSTREE_GPGDIR ?= "${TOPDIR}/gpg"
-OSTREE_GPGID  ?= "${@d.getVar('DISTRO').replace(' ', '_') + '-signing@key'}"
+# OSTREE_GPGDIR is where our GPG keyring is generated/located at and
+# OSTREE_GPGID is the default key ID we use to sign (commits in) the
+# repository. These two need to be customized for real builds.
+#
+# In development images the default is to use a key that gets
+# generated automatically on demand by refkit-signing-keys.bbclass.
+# Production images do not have a default.
+OSTREE_GPGDIR ?= "${REFKIT_SIGNING_GPGDIR}"
+OSTREE_GPGID_DEFAULT = "${@d.getVar('DISTRO').replace(' ', '_') + '-development-signing@key'}"
+REFKIT_SIGNING_KEYS_append = " ${OSTREE_GPGID_DEFAULT}"
+OSTREE_GPGID ?= "${@ '' if (d.getVar('IMAGE_MODE') or 'production') == 'production' else '${OSTREE_GPGID_DEFAULT}' }"
+inherit refkit-signing-keys
+python () {
+    if not d.getVar('OSTREE_GPGID'):
+        raise bb.parse.SkipRecipe('OSTREE_GPGID not set')
+}
 
 # OSTree remote (HTTP URL) where updates will be published.
 # Host the content of OSTREE_EXPORT there.
@@ -97,21 +109,6 @@ OSTREE_REMOTE ?= "https://update.example.org/ostree/"
 # repository, and finally produce an OSTree-enabled rootfs by cloning
 # and checking out the rootfs as an OSTree deployment.
 fakeroot do_ostree_prepare_rootfs () {
-    # Generate repository signing GPG keys, if we don't have them yet.
-    # TODO: replace with pre-generated keys in the repo instead of depending on meta-flatpak?
-    base=${@ '${OSTREE_GPGID}'.split('@')[0]}
-    pubkey=$base.pub
-    ${FLATPAKBASE}/scripts/gpg-keygen.sh \
-        --home ${OSTREE_GPGDIR} \
-        --id ${OSTREE_GPGID} \
-        --base $base
-
-    # Save (signing) public key for the repo.
-    if [ ! -e ${IMGDEPLOYDIR}/$pubkey -a -e ${TOPDIR}/$pubkey ]; then
-        bbnote "Saving OSTree repository signing key $pubkey"
-        cp -v ${TOPDIR}/$pubkey ${IMGDEPLOYDIR}
-    fi
-
     if [ -n "${OSTREE_REMOTE}" ]; then
         remote="--remote ${OSTREE_REMOTE}"
     else
