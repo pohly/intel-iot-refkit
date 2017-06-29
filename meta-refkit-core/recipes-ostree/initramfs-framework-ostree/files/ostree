@@ -12,22 +12,6 @@ ostree_enabled () {
     fi
 }
 
-
-# Print a fatal error message, starting a shell if we're in development mode.
-ostree_fatal () {
-    fatal "ostree: $*"
-}
-
-# Print an info message.
-ostree_info () {
-    msg "ostree: $*"
-}
-
-# Print a debug message.
-ostree_debug () {
-    debug "ostree: $*"
-}
-
 # Discover BootLoaderSpec-compliant boot loader entries.
 ostree_loader_entries () {
     local _boot=${1:-/boot}
@@ -76,7 +60,7 @@ ostree_loader_entries () {
 # Make the given directories/mount points movable.
 ostree_make_movable () {
     for _d in $*; do
-        ostree_info "making $_d movable..."
+        info "ostree: making $_d movable..."
         mount --bind $_d $_d || return 1
     done
 
@@ -97,7 +81,7 @@ ostree_prepare_root () {
     #   - bind-mount the common /boot into the deployment
     #   - bind-mount the common /home into the deployment
 
-    ostree_info "preparing $_root for pivot-rooting..."
+    info "ostree: preparing $_root for pivot-rooting..."
 
     cd $_root
 
@@ -126,7 +110,7 @@ ostree_shuffle_root () {
     # do these operations with an extra step to avoid trying to move the
     # eventual /sysroot (now /rootfs) under itself.
 
-    ostree_info "shuffling /sysroot, /rootfs and $_root for pivot-rooting..."
+    info "ostree: shuffling /sysroot, /rootfs and $_root for pivot-rooting..."
 
     cd $_root
 
@@ -145,7 +129,7 @@ ostree_shuffle_root () {
 ostree_initramfs_prepare_root () {
     local _entry_CURR _entry_PREV _path_CURR _path_PREV
 
-    ostree_info "* ostree: preparing ostree rootfs for booting..."
+    info "ostree: preparing ostree rootfs for booting..."
 
     # Discover, and parse loader entries.
     if ! ostree_loader_entries /rootfs/boot _entry _path; then
@@ -154,7 +138,7 @@ ostree_initramfs_prepare_root () {
 
     # Pick the ostree deployment root from the latest entry.
     OSTREE_ROOT="$_path_CURR"
-    ostree_info "active ostree entry: $OSTREE_ROOT"
+    info "ostree: active entry: $OSTREE_ROOT"
 
     # Prepare the deployment root for becoming the final runtime root, then
     # shuffle /rootfs, /sysroot and the deployment root around so that we
