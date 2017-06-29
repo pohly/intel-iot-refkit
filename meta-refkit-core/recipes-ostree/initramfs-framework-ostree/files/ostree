@@ -1,6 +1,8 @@
 #!/bin/sh
 
-# We consider the ostree module always enabled if it is installed.
+# This check runs after the root partition has been mounted, so
+# we can check for the expected /ostree/deploy directory to determine
+# whether the module needs to do anything.
 ostree_enabled () {
     if [ -d /rootfs/ostree/deploy ]; then
         return 0
@@ -113,8 +115,7 @@ ostree_shuffle_root () {
     local _root="$1"
 
     #
-    # This code mimicks the last bits of ostree-prepare-root. It shuffles
-    # /sysroot, /rootfs, and the chosen ostree deployment root ($_root) around
+    # It shuffles /sysroot, /rootfs, and the chosen ostree deployment root ($_root) around
     # so that /rootfs becomes $_root/sysroot and $_root becomes /rootfs. Then
     # eventually after the final pivot-root we end up with
     #
