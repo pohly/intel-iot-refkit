@@ -10,20 +10,10 @@
 # the device admin.
 STATELESS_RELOCATE ??= "False"
 
-# Set to a true boolean value 1/True for a recipe when it does not
-# need to be stateless, for example with
-# STATELESS_EXCLUDE_pn-core-image-sato = "1"
-#
-# The default is to exclude images which have
-# the "read-only" image feature set, because in those /etc can
-# be considered part of the read-only OS, and images
-# which are built as initramfs (detected based on their
-# IMAGE_FSTYPES).
-STATELESS_EXCLUDED ??= "${@ '1' if \
-    bb.data.inherits_class('image', d) and \
-    ('read-only' in d.getVar('IMAGE_FEATURES').split() or \
-     d.getVar('IMAGE_FSTYPES') == d.getVar('INITRAMFS_FSTYPES')) \
-    else '0' }"
+# Images are made stateless when "stateless" is in IMAGE_FEATURES.
+# By default, that feature is off because it is uncertain which
+# images need and support it.
+# IMAGE_FEATURES_append_pn-my-stateless-image = " stateless"
 
 # A space-separated list of shell patterns. Anything matching a
 # pattern is allowed in /etc. Changing this influences the QA check in
@@ -67,24 +57,30 @@ STATELESS_POST_POSTPROCESS ??= ""
 STATELESS_EXTRA_INSTALL ??= ""
 
 # STATELESS_SRC can be used to inject source code or patches into
-# SRC_URI of a recipe. It is a list of <url> <sha256sum> pairs.
+# SRC_URI of a recipe if (and only if) the 'stateless' distro feature is set.
+# It is a list of <url> <sha256sum> pairs.
+#
 # This is similar to:
 # SRC_URI_pn-foo = "http://some.example.com/foo.patch;name=foo"
 # SRC_URI[foo.sha256sum] = "1234"
 #
-# Setting the hash sum that way has the drawback of namespace
+# Setting the hash sum in SRC_URI has the drawback of namespace
 # collisions and triggering a world rebuilds for each varflag change,
 # because SRC_URI is modified for all recipes (in contrast to
 # normal variables, there's no syntax for setting varflags
 # per recipe). STATELESS_SRC avoids that because it gets expanded
 # seperately for each recipe.
+#
+# STATELESS_SRC is useful as an alternative for creating .bbappend
+# files. Long-term, all patches included this way should become part
+# of the upstream layers.
 STATELESS_SRC = ""
 
 python () {
     import urllib
     import os
     import string
-    src = d.getVar('STATELESS_SRC').split()
+    src = bb.utils.contains('DISTRO_FEATURES', 'stateless', d.getVar('STATELESS_SRC').split(), [], d)
     while src:
         url = src.pop(0)
         if not src:
@@ -102,10 +98,10 @@ python () {
 # semantic, because other commands might be injected the same way
 # and then ordering is not deterministic. For example, sort_passwd ends
 # up running after removing /etc/passwd, which defeats the purpose.
-ROOTFS_POSTPROCESS_COMMAND_prepend = "${@ '${STATELESS_PRE_POSTPROCESS}' if not oe.types.boolean('${STATELESS_EXCLUDED}') else '' }"
-ROOTFS_POSTPROCESS_COMMAND_append = "${@ '${STATELESS_POST_POSTPROCESS}' if not oe.types.boolean('${STATELESS_EXCLUDED}') else '' }"
+ROOTFS_POSTPROCESS_COMMAND_prepend = "${@ bb.utils.contains('IMAGE_FEATURES', 'stateless', d.getVar('STATELESS_PRE_POSTPROCESS', False), '', d) }"
+ROOTFS_POSTPROCESS_COMMAND_append = "${@ bb.utils.contains('IMAGE_FEATURES', 'stateless', d.getVar('STATELESS_POST_POSTPROCESS', False), '', d) }"
 
-CORE_IMAGE_EXTRA_INSTALL .= "${@ ' ${STATELESS_EXTRA_INSTALL}' if not oe.types.boolean('${STATELESS_EXCLUDED}') else '' }"
+FEATURE_PACKAGES_stateless = "${STATELESS_EXTRA_INSTALL}"
 
 def stateless_is_whitelisted(etcentry, whitelist):
     import fnmatch
@@ -184,7 +180,14 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
                         link = os.path.relpath(target, os.path.dirname(old))
                     if os.path.lexists(new):
                         os.unlink(new)
-                    os.symlink(link, new)
+                    if not factory and (link == '/dev/null' or link.endswith('../dev/null')):
+                        # Special case symlink to /dev/null (for example, /etc/tmpfiles.d/home.conf -> /dev/null):
+                        # this is used to erase system defaults via local image settings. As we are now merging
+                        # with the non-factory system defaults, we can simply erase the file and not
+                        # create the symlink.
+                        pass
+                    else:
+                        os.symlink(link, new)
                     os.unlink(old)
                 elif os.path.isdir(old):
                     if os.path.exists(new):
@@ -333,8 +336,7 @@ python () {
 ROOTFS_POSTUNINSTALL_COMMAND_append = "stateless_mangle_rootfs;"
 
 python stateless_mangle_rootfs () {
-    pn = d.getVar('PN', True)
-    if oe.types.boolean(d.getVar('STATELESS_EXCLUDED')):
+    if not bb.utils.contains('IMAGE_FEATURES', 'stateless', True, False, d):
         return
 
     rootfsdir = d.getVar('IMAGE_ROOTFS', True)
