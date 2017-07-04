@@ -137,24 +137,12 @@ STATELESS_MV_ROOTFS += " \
 #    https://raw.githubusercontent.com/clearlinux-pkgs/Linux-PAM/0681d308b660919e6a7ee71be41397dbc8516519/0001-pam_securetty-Do-not-report-non-fatal-documented-beh.patch \
 #"
 
-# Both connman and systemd create this via tmpfiles.d, no need to
-# have it in /etc.
-STATELESS_RM_ROOTFS += " \
-    resolv.conf \
+# OE chooses the actual resolver (for example, ConnMan vs systemd) at
+# build time by symlinking /etc/resolv.conf to the actual .conf file.
+# We need to preserve that choice.
+STATELESS_MV_ROOTFS += " \
+    resolv.conf=factory \
 "
-# When connman is installed, the intent probably is to use it also as
-# resolver. This happens to work in practice (connman_resolvconf.conf
-# sorts before etc.conf), but systemd warns about the conflict.
-# Better avoid that conflict.
-STATELESS_POST_POSTPROCESS += " stateless_pick_resolv_conf; "
-stateless_pick_resolv_conf () {
-    if ( [ -e ${IMAGE_ROOTFS}${sysconfdir}/tmpfiles.d/connman_resolvconf.conf ] ||
-        [ -e ${IMAGE_ROOTFS}${libdir}/tmpfiles.d/connman_resolvconf.conf ] ) &&
-       [ -f ${IMAGE_ROOTFS}${libdir}/tmpfiles.d/etc.conf ]; then
-        sed -i -e 's;^\(L.* /etc/resolv.conf *.*\);# provided by connman: \1;' \
-            ${IMAGE_ROOTFS}${libdir}/tmpfiles.d/etc.conf
-    fi
-}
 
 # Also covered by systemd's etc.conf.
 STATELESS_RM_ROOTFS += " \
@@ -358,6 +346,20 @@ STATELESS_MV_ROOTFS += " \
     hostname=factory \
 "
 
+# thermald: upstart init file not needed,
+# config file can be in factory.
+STATELESS_RM_ROOTFS += " \
+    init/thermald.conf \
+"
+STATELESS_MV_ROOTFS += " \
+    thermald=factory \
+"
+
+# Not using grub, remove it?
+STATELESS_RM_ROOTFS += " \
+    grub.d/15_ostree \
+"
+
 # Various things that systemd and journald do not need when they
 # start.
 STATELESS_MV_ROOTFS += " \
@@ -378,9 +380,12 @@ STATELESS_MV_ROOTFS += " \
     mke2fs.conf=factory \
     motd=factory \
     network=factory \
+    nftables=factory \
     os-release=factory \
     profile=factory \
     request-key.conf=factory \
+    resolv-conf.connman=factory \
+    resolv-conf.systemd=factory \
     security=factory \
     ssh=factory \
     skel=factory \
@@ -388,4 +393,15 @@ STATELESS_MV_ROOTFS += " \
     udhcpc.d=factory \
     version=factory \
     wpa_supplicant.conf=factory \
+"
+
+# However, there is one exception: meta-intel/common/recipes-bsp/amt/lms8_8.0.0-7.bb
+# does not provide a systemd unit file and thus depends on /etc/init.d.
+STATELESS_ETC_WHITELIST += "init.d/lms8"
+
+# Moving the resolv-conf.* symlinks leads to dangling symlinks that we need to
+# whitelist.
+REFKIT_QA_IMAGE_SYMLINK_WHITELIST_append = " \
+    ${datadir}/factory/run/systemd/resolve/resolv.conf \
+    ${datadir}/factory/run/connman/resolv.conf \
 "
