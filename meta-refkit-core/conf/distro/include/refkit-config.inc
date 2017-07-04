@@ -58,6 +58,11 @@ REFKIT_DEFAULT_DISTRO_FEATURES += "refkit-config"
 # Enable OSTree system update support.
 REFKIT_DEFAULT_DISTRO_FEATURES += "ostree"
 
+# Reconfigure and/or patch some recipes to support "stateless" images
+# better (stateless = configuration in /etc can be created locally
+# or isn't needed at all).
+REFKIT_DEFAULT_DISTRO_FEATURES += "stateless"
+
 # Remove currently unsupported distro features from global defaults
 REFKIT_DEFAULT_DISTRO_FEATURES_REMOVE += "x11 3g"
 
