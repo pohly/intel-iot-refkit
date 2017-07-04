@@ -43,10 +43,10 @@ index a2004f4..7553920 100644
  
  	if (shadow)
 -		old_fp = fopen(filename, "r+");
-+		old_fp = fopen(filename, "w+");
++		old_fp = fopen(filename, "a+");
  	else
 -		old_fp = fopen_or_warn(filename, "r+");
-+		old_fp = fopen_or_warn(filename, "w+");
++		old_fp = fopen_or_warn(filename, "a+");
  	if (!old_fp) {
  		if (shadow)
  			ret = 0; /* missing shadow is not an error */
