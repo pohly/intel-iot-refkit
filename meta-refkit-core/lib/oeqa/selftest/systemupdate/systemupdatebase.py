@@ -220,12 +220,18 @@ class SystemUpdateBase(OESelftestTestCase):
     # The image that will get built, booted and updated.
     IMAGE_PN = 'core-image-minimal'
 
-    # The .bbappend name which matches IMAGE_PN.
+    # The image used for preparing the update. Usually
+    # the same, but some update mechanisms may also
+    # support switching between images.
+    IMAGE_PN_UPDATE = IMAGE_PN
+
+    # The .bbappend name which matches IMAGE_PN resp. IMAGE_PN_UPDATE.
     # For example, OSTree might build and boot "core-image-minimal-ostree",
     # but the actual image recipe is "core-image-minimal" and thus
     # we would need "core-image-minimal.bbappend". Also allows to handle
     # cases where the bbappend file name must have a wildcard.
     IMAGE_BBAPPEND = 'core-image-minimal.bbappend'
+    IMAGE_BBAPPEND_UPDATE = IMAGE_BBAPPEND
 
     # Additional image settings that will get written into the IMAGE_BBAPPEND.
     IMAGE_CONFIG = ''
@@ -271,8 +277,10 @@ class SystemUpdateBase(OESelftestTestCase):
             applied also to image variants.
             """
 
-            self.track_for_cleanup(self.IMAGE_BBAPPEND)
-            with open(self.IMAGE_BBAPPEND, 'w') as f:
+            bbappend = self.IMAGE_BBAPPEND_UPDATE if is_update else self.IMAGE_BBAPPEND
+            self.append_config('BBFILES_append = " %s"' % os.path.abspath(bbappend))
+            self.track_for_cleanup(bbappend)
+            with open(bbappend, 'w') as f:
                 f.write('''
 python system_update_test_modify () {
     import base64
@@ -295,7 +303,7 @@ ROOTFS_POSTPROCESS_COMMAND += "system_update_test_modify;"
        self.IMAGE_MODIFY.modify_image_build(testname, updates, is_update)))
 
         # Creating a .bbappend for the image will trigger a rebuild.
-        self.write_config('BBFILES_append = " %s"' % os.path.abspath(self.IMAGE_BBAPPEND))
+        # To avoid this, use separate image recipes.
         create_image_bbappend(False)
         self.logger.info('Building base image')
         result = bitbake(self.IMAGE_PN, output_log=self.logger)
@@ -307,12 +315,6 @@ ROOTFS_POSTPROCESS_COMMAND += "system_update_test_modify;"
         # self.track_for_cleanup(self.image_dir_test)
         oe.path.copyhardlinktree(self.image_dir, self.image_dir_test)
 
-        # Now we change our .bbappend so that the updated state is generated
-        # during the next rebuild.
-        create_image_bbappend(True)
-        self.logger.info('Building updated image')
-        bitbake(self.IMAGE_PN, output_log=self.logger)
-
         # Change DEPLOY_DIR_IMAGE so that we use our copy of the
         # images from before the update. Further customizations for booting can
         # be done by rewriting self.image_dir_test/IMAGE_PN-MACHINE.qemuboot.conf
@@ -323,6 +325,13 @@ ROOTFS_POSTPROCESS_COMMAND += "system_update_test_modify;"
         # Boot image, verify before and after update.
         with self.boot_image(overrides) as qemu:
             self.verify_image(testname, False, qemu, updates)
+
+            # Now we change our .bbappend so that the updated state is generated
+            # during the next rebuild.
+            create_image_bbappend(True)
+            self.logger.info('Building updated image')
+            bitbake(self.IMAGE_PN_UPDATE, output_log=self.logger)
+
             reboot = self.update_image(qemu)
             if not reboot:
                 self.verify_image(testname, True, qemu, updates)

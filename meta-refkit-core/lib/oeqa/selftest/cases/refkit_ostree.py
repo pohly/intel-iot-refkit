@@ -17,7 +17,9 @@ class RefkitOSTreeUpdateBase(SystemUpdateBase):
     # We test the normal refkit-image-common with
     # OSTree system update enabled.
     IMAGE_PN = 'refkit-image-common'
+    IMAGE_PN_UPDATE = IMAGE_PN
     IMAGE_BBAPPEND = 'refkit-image-common.bbappend'
+    IMAGE_BBAPPEND_UPDATE = IMAGE_BBAPPEND
     IMAGE_CONFIG = '''
 IMAGE_FEATURES_append = " ostree"
 '''
@@ -146,3 +148,28 @@ class RefkitOSTreeUpdateMeta(type):
 
 class RefkitOSTreeUpdateTestIndividual(RefkitOSTreeUpdateBase, metaclass=RefkitOSTreeUpdateMeta):
     pass
+
+class RefkitOSTreeUpdateTestDev(RefkitOSTreeUpdateTestAll, metaclass=RefkitOSTreeUpdateMeta):
+    """
+    This class avoids rootfs rebuilding by using two separate image
+    recipes. It's using slight tricks like overriding the OSTREE_BRANCH,
+    so the other tests are more realistic. Use this one when debugging problems.
+    """
+
+    IMAGE_PN = 'refkit-image-update-test-a'
+    IMAGE_PN_UPDATE = 'refkit-image-update-test-b'
+    IMAGE_BBAPPEND = 'refkit-image-update-test-a.bbappend'
+    IMAGE_BBAPPEND_UPDATE = 'refkit-image-update-test-b.bbappend'
+
+    def setUpLocal(self):
+        super().setUpLocal()
+        def create_image_bb(pn):
+            bb = pn + '.bb'
+            self.track_for_cleanup(bb)
+            self.append_config('BBFILES_append = " %s"' % os.path.abspath(bb))
+            with open(bb, 'w') as f:
+                f.write('require ${META_REFKIT_CORE_BASE}/recipes-images/images/refkit-image-common.bb\n')
+                f.write('OSTREE_BRANCHNAME = "${DISTRO}/${MACHINE}/%s"\n' % self.IMAGE_PN)
+                f.write('''IMAGE_FEATURES_append = "${@ bb.utils.filter('DISTRO_FEATURES', 'stateless', d)}"\n''')
+        create_image_bb(self.IMAGE_PN)
+        create_image_bb(self.IMAGE_PN_UPDATE)
