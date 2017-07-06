@@ -61,6 +61,8 @@ systemd_sysusers_create () {
                     fi
                     comment=$(echo "$remaining" | cut -d '"' -f 2)
                     home=$(echo "$remaining" | cut -d '"' -f 3 | sed -e 's/^ *//' -e 's/ *$//')
+                    echo "/etc/passwd:"
+                    cat ${IMAGE_ROOTFS}/etc/passwd
                     perform_useradd "${IMAGE_ROOTFS}" "$opts $uid --home-dir ${home:-/} --shell /sbin/nologin --comment \"$comment\" $name" 10
                     ;;
                   "")

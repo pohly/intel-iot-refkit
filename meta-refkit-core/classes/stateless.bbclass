@@ -3,26 +3,24 @@
 # (although configuring them differently may lead to
 # better results).
 
-# If set to True, a recipe gets configured with
-# sysconfdir=${datadir}/defaults. If set to a path, that
-# path is used instead. In both cases, /etc typically gets
-# ignored and the component no longer can be configured by
-# the device admin.
-STATELESS_RELOCATE ??= "False"
-
 # Images are made stateless when "stateless" is in IMAGE_FEATURES.
 # By default, that feature is off because it is uncertain which
 # images need and support it.
 # IMAGE_FEATURES_append_pn-my-stateless-image = " stateless"
 
-# A space-separated list of shell patterns. Anything matching a
-# pattern is allowed in /etc. Changing this influences the QA check in
-# do_rootfs.
-STATELESS_ETC_WHITELIST ??= "${STATELESS_ETC_DIR_WHITELIST}"
+# There's a QA check in do_rootfs that warns or errors out when /etc
+# is not empty in a stateless image. Because /etc does not actually
+# need to be empty (for example, when using OSTree), that check is off
+# by default. Valid values: no/warn/error
+STATELESS_ETC_CHECK_EMPTY ?= "no"
 
-# A subset of STATELESS_ETC_WHITELIST which determines which directories
-# to keep in /etc although they are empty. Normally such directories
-# get removed.
+# A space-separated list of shell patterns. Anything matching a
+# pattern is allowed in /etc. Changing this influences the QA check.
+STATELESS_ETC_WHITELIST ??= ""
+
+# Determines which directories to keep in /etc although they are
+# empty. Normally such directories get removed. Influences the
+# QA check and the actual rootfs mangling.
 STATELESS_ETC_DIR_WHITELIST ??= ""
 
 # A space-separated list of entries in /etc which need to be moved
@@ -44,14 +42,9 @@ STATELESS_MV_ROOTFS ??= ""
 # entirely.
 STATELESS_RM_ROOTFS ??= ""
 
-# Semicolon-separated commands which get run after RM/MV ROOTFS
-# changes and before the normal ROOTFS_POSTPROCESS_COMMAND, if
-# the image is meant to be stateless.
-STATELESS_PRE_POSTPROCESS ??= ""
-
 # Semicolon-separated commands which get run after the normal
 # ROOTFS_POSTPROCESS_COMMAND, if the image is meant to be stateless.
-STATELESS_POST_POSTPROCESS ??= ""
+STATELESS_POSTPROCESS ??= ""
 
 # Extra packages to be installed into stateless images.
 STATELESS_EXTRA_INSTALL ??= ""
@@ -73,8 +66,12 @@ STATELESS_EXTRA_INSTALL ??= ""
 #
 # STATELESS_SRC is useful as an alternative for creating .bbappend
 # files. Long-term, all patches included this way should become part
-# of the upstream layers.
+# of the upstream layers and then stateless.bbclass also no longer
+# needs to be inherited globally.
 STATELESS_SRC = ""
+
+
+###########################################################################
 
 python () {
     import urllib
@@ -92,16 +89,76 @@ python () {
         d.setVarFlag('SRC_URI', '%s.sha256sum' % name, shasum)
 }
 
-###########################################################################
-
-# TODO: using _prepend and _append does not completely ensure the intended
-# semantic, because other commands might be injected the same way
-# and then ordering is not deterministic. For example, sort_passwd ends
-# up running after removing /etc/passwd, which defeats the purpose.
-ROOTFS_POSTPROCESS_COMMAND_prepend = "${@ bb.utils.contains('IMAGE_FEATURES', 'stateless', d.getVar('STATELESS_PRE_POSTPROCESS', False), '', d) }"
-ROOTFS_POSTPROCESS_COMMAND_append = "${@ bb.utils.contains('IMAGE_FEATURES', 'stateless', d.getVar('STATELESS_POST_POSTPROCESS', False), '', d) }"
-
+# "stateless" IMAGE_FEATURES definition
+IMAGE_FEATURES[validitems] += "stateless"
 FEATURE_PACKAGES_stateless = "${STATELESS_EXTRA_INSTALL}"
+
+# Several post-install scripts modify /etc.
+# For example:
+# /etc/shells - gets extended when installing a shell package
+# /etc/passwd - adduser in postinst extends it
+# /etc/systemd/system - has several .wants entries
+#
+# Instead of completely changing how OE configures images,
+# stateless images just take those potentially modified /etc entries
+# and makes them part of the read-only system.
+
+# This can be done in different ways:
+# 1. permanently move them into /usr and ensure that software looks
+#    for entries under both /etc and /usr (example: nss-altfiles
+#    for a read-only system user and group database)
+# 2. move files in /etc to /usr/share/doc/etc and do not restore
+#    them during booting in those cases where a) the file mirrors
+#    the builtin defaults of the component using them and b) the
+#    component works without the file present.
+# 3. use a system update and boot mechanism which creates /etc from
+#    system defaults before booting (example: OSTree)
+# 4. restore files in /etc during the early boot phase (example:
+#    systemd tmpfiles.d)
+#
+# Case 2 is hard to do in a post-process step, because it's impossible
+# to know whether the file in /etc represents builtin defaults. While
+# stateless.bbclass has support for this, it's something that is better
+# done as part of component packaging.
+#
+# In case 3 and 4, modifying /etc is possible, but then future system
+# updates of the modified files will be ignored.
+#
+ROOTFS_POSTUNINSTALL_COMMAND_append = "${@ bb.utils.contains('IMAGE_FEATURES', 'stateless', ' stateless_mangle_rootfs;', '', d) }"
+
+python stateless_mangle_rootfs () {
+    from oe.utils import execute_pre_post_process
+    cmds = d.getVar('STATELESS_POSTPROCESS')
+    execute_pre_post_process(d, cmds)
+
+    rootfsdir = d.getVar('IMAGE_ROOTFS', True)
+    docdir = rootfsdir + d.getVar('datadir', True) + '/doc/etc'
+    whitelist = (d.getVar('STATELESS_ETC_WHITELIST', True) or '').split()
+    dirwhitelist = (d.getVar('STATELESS_ETC_DIR_WHITELIST', True) or '').split()
+    stateless_mangle(d, rootfsdir, docdir,
+                     (d.getVar('STATELESS_MV_ROOTFS', True) or '').split(),
+                     (d.getVar('STATELESS_RM_ROOTFS', True) or '').split(),
+                     dirwhitelist)
+    import os
+    etcdir = os.path.join(rootfsdir, 'etc')
+    valid = True
+    etc_empty = d.getVar('STATELESS_ETC_CHECK_EMPTY')
+    etc_empty_allowed = ('no', 'warn', 'error')
+    if etc_empty not in etc_empty_allowed:
+        bb.fatal('STATELESS_ETC_CHECK_EMPTY = "%s" not one of the valid choices (%s)' %
+                 (etc_empty, '/'.join(etc_empty_allowed)))
+    if etc_empty != 'no':
+        for dirpath, dirnames, filenames in os.walk(etcdir):
+            for entry in filenames + [x for x in dirnames if os.path.islink(x)]:
+                fullpath = os.path.join(dirpath, entry)
+                etcentry = fullpath[len(etcdir) + 1:]
+                if not stateless_is_whitelisted(etcentry, whitelist) and \
+                   not stateless_is_whitelisted(etcentry, dirwhitelist):
+                    bb.warn('stateless: rootfs contains %s' % fullpath)
+                    valid = False
+        if not valid and etc_empty == 'error':
+            bb.fatal('stateless: /etc not empty')
+}
 
 def stateless_is_whitelisted(etcentry, whitelist):
     import fnmatch
@@ -110,7 +167,7 @@ def stateless_is_whitelisted(etcentry, whitelist):
             return True
     return False
 
-def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, is_package):
+def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist):
     import os
     import stat
     import errno
@@ -208,7 +265,13 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
             if factory:
                 # Add new tmpfiles.d entry for the top-level directory.
                 with open(os.path.join(tmpfilesdir, 'stateless.conf'), 'a+') as f:
-                    f.write('C /etc/%s - - - -\n' % etcentry)
+                    if os.path.islink(new):
+                        # Symlinks have to be created with a special tmpfiles.d entry.
+                        link = os.readlink(new)
+                        os.unlink(new)
+                        f.write('L /etc/%s - - - - %s\n' % (etcentry, link))
+                    else:
+                        f.write('C /etc/%s - - - - -\n' % etcentry)
                 # We might have moved an entry for which systemd (or something else)
                 # already had a tmpfiles.d entry. We need to remove that other entry
                 # to ensure that ours is used instead.
@@ -240,16 +303,11 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
     # removed.
     etcdir = os.path.join(root, 'etc')
     def tryrmdir(path):
-        if is_package and \
-           path.endswith('/etc/modprobe.d') or \
-           path.endswith('/etc/modules-load.d'):
-           # Expected to exist by kernel-module-split.bbclass
-           # which will clean it itself.
-           return
-        if stateless_is_whitelisted(path[len(etcdir) + 1:], dirwhitelist):
+        entry = path[len(etcdir) + 1:]
+        if stateless_is_whitelisted(entry, dirwhitelist):
            bb.note('stateless: keeping white-listed directory %s' % path)
            return
-        bb.note('stateless: removing dir %s' % path)
+        bb.note('stateless: removing dir %s (%s not in %s)' % (path, entry, dirwhitelist))
         path_stat = os.stat(path)
         try:
             os.rmdir(path)
@@ -278,85 +336,3 @@ def stateless_mangle(d, root, docdir, stateless_mv, stateless_rm, dirwhitelist, 
             for file in files:
                 bb.note('stateless: /etc not empty: %s' % os.path.join(root, file))
         tryrmdir(etcdir)
-
-python () {
-    # The bitbake cache must be told explicitly that changes in the
-    # directories have an effect on the recipe. Otherwise adding
-    # or removing patches or whole directories does not trigger
-    # re-parsing and re-building.
-    import os
-    patchdir = d.expand('${STATELESS_PATCHES_BASE}/${PN}')
-    bb.parse.mark_dependency(d, patchdir)
-    if os.path.isdir(patchdir):
-        patches = os.listdir(patchdir)
-        if patches:
-            filespath = d.getVar('FILESPATH', True)
-            d.setVar('FILESPATH', filespath + ':' + patchdir)
-            srcuri = d.getVar('SRC_URI', True)
-            d.setVar('SRC_URI', srcuri + ' ' + ' '.join(['file://' + x for x in sorted(patches)]))
-
-    # Dynamically reconfigure the package to use /usr instead of /etc for
-    # configuration files.
-    relocate = d.getVar('STATELESS_RELOCATE', True)
-    if relocate != 'False':
-        defaultsdir = d.expand('${datadir}/defaults') if relocate == 'True' else relocate
-        d.setVar('sysconfdir', defaultsdir)
-        d.setVar('EXTRA_OECONF', d.getVar('EXTRA_OECONF', True) + " --sysconfdir=" + defaultsdir)
-}
-
-# Several post-install scripts modify /etc.
-# For example:
-# /etc/shells - gets extended when installing a shell package
-# /etc/passwd - adduser in postinst extends it
-# /etc/systemd/system - has several .wants entries
-#
-# We fix this directly after the write_image_manifest command
-# in the ROOTFS_POSTUNINSTALL_COMMAND.
-#
-# However, that is very late, so changes made by a ROOTFS_POSTPROCESS_COMMAND
-# (like setting an empty root password) become part of the system,
-# which might not be intended in all cases.
-#
-# It would be better to do this directly after installing with
-# ROOTFS_POSTINSTALL_COMMAND += "stateless_mangle_rootfs;"
-# However, opkg then becomes unhappy and causes failures in the
-# *_manifest commands which get executed later:
-#
-# ERROR: Cannot get the installed packages list. Command '.../opkg -f .../refkit-image-minimal/1.0-r0/opkg.conf -o .../refkit-image-minimal/1.0-r0/rootfs  --force_postinstall --prefer-arch-to-version   status' returned 0 and stderr:
-# Collected errors:
-#  * file_md5sum_alloc: Failed to open file .../refkit-image-minimal/1.0-r0/rootfs/etc/hosts: No such file or directory.
-#
-# ERROR: Function failed: write_package_manifest
-#
-# TODO: why does opkg complain? /etc/hosts is listed in CONFFILES of netbase,
-# so it should be valid to remove it. If we can fix that and ensure that
-# all /etc files are marked as CONFFILES (perhaps by adding that as
-# default for all packages), then we can use ROOTFS_POSTINSTALL_COMMAND
-# again.
-ROOTFS_POSTUNINSTALL_COMMAND_append = "stateless_mangle_rootfs;"
-
-python stateless_mangle_rootfs () {
-    if not bb.utils.contains('IMAGE_FEATURES', 'stateless', True, False, d):
-        return
-
-    rootfsdir = d.getVar('IMAGE_ROOTFS', True)
-    docdir = rootfsdir + d.getVar('datadir', True) + '/doc/etc'
-    whitelist = (d.getVar('STATELESS_ETC_WHITELIST', True) or '').split()
-    stateless_mangle(d, rootfsdir, docdir,
-                     (d.getVar('STATELESS_MV_ROOTFS', True) or '').split(),
-                     (d.getVar('STATELESS_RM_ROOTFS', True) or '').split(),
-                     whitelist,
-                     False)
-    import os
-    etcdir = os.path.join(rootfsdir, 'etc')
-    valid = True
-    for dirpath, dirnames, filenames in os.walk(etcdir):
-        for entry in filenames + [x for x in dirnames if os.path.islink(x)]:
-            fullpath = os.path.join(dirpath, entry)
-            etcentry = fullpath[len(etcdir) + 1:]
-            if not stateless_is_whitelisted(etcentry, whitelist):
-                bb.warn('stateless: rootfs should not contain %s' % fullpath)
-                valid = False
-    if not valid:
-        bb.fatal('stateless: /etc not empty')
-}

@@ -59,8 +59,11 @@ REFKIT_DEFAULT_DISTRO_FEATURES += "refkit-config"
 REFKIT_DEFAULT_DISTRO_FEATURES += "ostree"
 
 # Reconfigure and/or patch some recipes to support "stateless" images
-# better (stateless = configuration in /etc can be created locally
-# or isn't needed at all).
+# better (stateless = configuration in /etc can be created locally or
+# isn't needed at all). Note that the actual changes are defined by
+# the stateless*.inc files included by a distro config like
+# refkit.conf, i.e. merely including refkit-config.inc does not
+# have much effect.
 REFKIT_DEFAULT_DISTRO_FEATURES += "stateless"
 
 # Remove currently unsupported distro features from global defaults
