@@ -38,6 +38,9 @@ SDKMACHINE ?= "x86_64"
 # Generate source mirror tarballs:
 BB_GENERATE_MIRROR_TARBALLS = "1"
 
+# Show the sstate cache settings at start of build.
+BUILDCFG_VARS_append = " SSTATE_MIRRORS"
+
 # Configure images in "development mode".
 require conf/distro/include/refkit-development.inc
 
@@ -50,10 +53,10 @@ REFKIT_VM_IMAGE_TYPES ?= "wic.xz wic.bmap"
 #
 # pre/post-build oe-selftests started by CI builder, whitespace-separated.
 #
-REFKIT_CI_PREBUILD_SELFTESTS="iotsstatetests.SStateTests.test_sstate_samesigs"
+REFKIT_CI_PREBUILD_SELFTESTS=""
 # https://bugzilla.yoctoproject.org/show_bug.cgi?id=11756 currently causes
 # oe-selftest to ignore the order.
-REFKIT_CI_POSTBUILD_SELFTESTS="secureboot refkit_poky refkit_license_check refkit_ostree.RefkitOSTreeUpdateTestAll image_installer"
+REFKIT_CI_POSTBUILD_SELFTESTS=""
 #
 # Automated build targets
 # Those targets should be space separated list of items,
@@ -62,31 +65,19 @@ REFKIT_CI_POSTBUILD_SELFTESTS="secureboot refkit_poky refkit_license_check refki
 #
 # Following targets would be used to perform default build task.
 REFKIT_CI_BUILD_TARGETS=" \
-  refkit-image-minimal \
-  refkit-image-computervision \
-  refkit-image-gateway \
-  refkit-image-industrial \
-  refkit-installer-image \
-  swtpm-wrappers-native \
-  ovmf \
+    quilt-native \
 "
 
 # Following targets would be executed with do_populate_sdk task
 REFKIT_CI_SDK_TARGETS=""
 # Following targets would be executed with do_populate_sdk_ext task.
 REFKIT_CI_ESDK_TARGETS=" \
-  refkit-image-common \
-  refkit-image-gateway \
-  refkit-image-computervision \
 "
 # Following targets would be executed with do_testsdkext task.
 REFKIT_CI_ESDK_TEST_TARGETS=" \
-  refkit-image-common \
-  refkit-image-gateway \
-  refkit-image-computervision \
 "
 # Following targets would be executed with do_test_iot_export task
-REFKIT_CI_TEST_EXPORT_TARGETS="refkit-image-common refkit-image-computervision refkit-image-gateway refkit-image-industrial \
+REFKIT_CI_TEST_EXPORT_TARGETS=" \
 "
 
 # Execute automatic tests for following images with corresponding
@@ -94,15 +85,6 @@ REFKIT_CI_TEST_EXPORT_TARGETS="refkit-image-common refkit-image-computervision r
 # Space separated list of tuples, each should in format:
 # <image_name>,<testsuite_name>,<testfiles_name>,$MACHINE,<test_device_name>
 REFKIT_CI_TEST_RUNS=" \
-  refkit-image-common,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},570x \
-  refkit-image-common,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},minnowboardturbot \
-  refkit-image-common,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},qemu \
-  refkit-image-computervision,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},570x \
-  refkit-image-computervision,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},minnowboardturbot \
-  refkit-image-gateway,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},570x \
-  refkit-image-gateway,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},minnowboardturbot \
-  refkit-image-industrial,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},570x \
-  refkit-image-industrial,iot-testsuite.tar.gz,iot-testfiles.${MACHINE}.tar.gz,${MACHINE},minnowboardturbot \
 "
 
 # Dont use disk space monitor in CI builds, to avoid frequent
