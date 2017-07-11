@@ -101,12 +101,10 @@ fi
 # to run. This makes it possible to investigate signature changes in post-build.sh.
 bitbake -S none ${_bitbake_targets}
 
-if [ ! -z ${JOB_NAME+x} ]; then
-  # CI run: save output to log file
-  bitbake -D -D ${_bitbake_targets} 2>&1 | tee -a $WORKSPACE/$CI_LOG
-else
-  bitbake -D -D ${_bitbake_targets}
-fi
+bitbake -D -D ${_bitbake_targets}  >$WORKSPACE/$CI_LOG 2>&1
+
+grep -i -e checkstatus -e SState -e quilt-native $WORKSPACE/$CI_LOG
+exit 1
 
 if [ ! -z ${JOB_NAME+x} ]; then
   # in CI run only:
