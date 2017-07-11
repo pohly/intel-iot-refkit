@@ -101,8 +101,8 @@ fi
 # to run. This makes it possible to investigate signature changes in post-build.sh.
 bitbake -S none ${_bitbake_targets}
 
+bitbake -p
 bitbake -D -D ${_bitbake_targets}  >$WORKSPACE/$CI_LOG 2>&1
-
 grep -i -e checkstatus -e SState -e quilt-native $WORKSPACE/$CI_LOG
 exit 1
 
