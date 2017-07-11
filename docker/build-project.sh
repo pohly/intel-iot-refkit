@@ -102,8 +102,8 @@ fi
 bitbake -S none ${_bitbake_targets}
 
 bitbake -p
-bitbake -D -D ${_bitbake_targets}  >$WORKSPACE/$CI_LOG 2>&1
-grep -i -e checkstatus -e SState -e quilt-native $WORKSPACE/$CI_LOG
+bitbake --dry-run -D -D ${_bitbake_targets}  >$WORKSPACE/$CI_LOG 2>&1
+grep -i -e checkstatus -e SState -e quilt-native -e NOTE: $WORKSPACE/$CI_LOG
 exit 1
 
 if [ ! -z ${JOB_NAME+x} ]; then
