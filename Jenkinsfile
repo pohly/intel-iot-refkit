@@ -84,8 +84,8 @@ try {
                     params = ["${script_env}", "docker/pre-build.sh"].join("\n")
                     stage('Pre-build tests') {
                         sh "${params}"
-                        summary += sh(returnStdout: true,
-                                      script: "docker/tester-create-summary.sh 'oe-selftest: pre-build' '' build.pre/TestResults_*/TEST- 0")
+                        // summary += sh(returnStdout: true,
+                        //              script: "docker/tester-create-summary.sh 'oe-selftest: pre-build' '' build.pre/TestResults_*/TEST- 0")
                     }
                     try {
                         set_gh_status(is_pr, 'PENDING', 'Building')
