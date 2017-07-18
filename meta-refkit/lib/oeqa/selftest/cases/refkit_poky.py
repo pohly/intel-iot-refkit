@@ -62,6 +62,14 @@ class RefkitPokyMeta(type):
                 - proper declaration of dependencies (because 'yocto-compat-layer.py --dependency' adds those)
                 - parse and dependencies ('bitbake -S none world' must work)
                 """
+                # Workaround for yocto-compat-layer.py not evaluating
+                # LAYERDEPENDS_security += "${@bb.utils.contains("DISTRO_FEATURES", "x11", "gnome-layer xfce-layer", "", d)}"
+                # in meta-security: add the layer ourselves in those cases where we know that it is needed.
+                if refkit_layer in ('meta-refkit',):
+                    for layer in ('meta-oe', 'meta-python', 'meta-gnome', 'meta-xfce'):
+                        cmd = "bitbake-layers add-layer %s" % self.layers[layer]
+                        runCmd(cmd)
+
                 cmd = "yocto-compat-layer.py --dependency %s -- %s" % (
                     ' '.join(self.layers.values()),
                     self.layers[refkit_layer])
