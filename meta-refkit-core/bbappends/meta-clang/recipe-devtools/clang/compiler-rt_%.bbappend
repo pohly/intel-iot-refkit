@@ -8,7 +8,7 @@ FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
 # cl_khr_3d_image_writes extension to be enabled").
 #
 # However, the upstream commit was also incomplete.
-SRC_URI_append = " \
+SRC_URI_append_df-refkit-config = " \
     file://Fix-sanitizer-build-against-latest-glibc.patch \
     file://Fix-sanitizer-build-against-latest-glibc-missing-hunk.patch \
 "
