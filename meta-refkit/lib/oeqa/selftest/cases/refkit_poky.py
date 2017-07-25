@@ -23,6 +23,7 @@
 
 """Test cases for refkit content against Poky"""
 
+import errno
 import os
 import re
 import shutil
@@ -169,7 +170,21 @@ include selftest.inc
     def setUpLocal(self):
         """Creates a clean build directory with a Poky configuration."""
         if os.path.exists(self.poky_dir):
-            shutil.rmtree(self.poky_dir)
+            def onerror(function, path, excinfo):
+                # There might have been a bitbake.sock from the previous
+                # bitbake invocation. We are not using a persistent
+                # bitbake (BB_SERVER_TIMEOUT is unset), so this
+                # bitbake.sock should get removed by the old bitbake
+                # itself when it quits, leading to a race condition.
+                ex = excinfo[1]
+                self.logger.warn('rmtree failed: %s / %s / %s (%s)' % (function, path, excinfo, ex))
+                if os.path.basename(path) == 'bitbake.sock' and ex.errno == errno.ENOENT:
+                    # It's gone, so we can proceed without throwing a:
+                    # FileNotFoundError: [Errno 2] No such file or directory: 'bitbake.sock'
+                    pass
+                else:
+                    raise
+            shutil.rmtree(self.poky_dir, onerror=onerror)
         bb.utils.mkdirhier(self.poky_dir)
         bb.utils.mkdirhier(self.poky_conf_dir)
         with open(os.path.join(self.poky_conf_dir, 'local.conf'), 'w') as f:
